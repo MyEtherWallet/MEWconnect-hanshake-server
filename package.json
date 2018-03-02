@@ -2,5 +2,9 @@
   "name": "MewSigner",
   "version": "0.0.1",
   "description": "MEW Web socket Signaling server",
-  "main": "server.js"
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.16.2",
+    "socket.io": "^2.0.4"
+  }
 }
