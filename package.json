@@ -1,10 +1,29 @@
 {
-  "name": "MewSigner",
+  "name": "mewsigner",
   "version": "0.0.1",
   "description": "MEW Web socket Signaling server",
   "main": "server.js",
+  "scripts": {
+    "start": "nodemon server.js"
+  },
   "dependencies": {
     "express": "^4.16.2",
+    "http": "0.0.0",
+    "nodemon": "^1.17.1",
     "socket.io": "^2.0.4"
-  }
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MyEtherWallet/mew-signer-hs.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MyEtherWallet/mew-signer-hs/issues"
+  },
+  "engines": {
+    "node": "8.9.1"
+  },
+  "homepage": "https://github.com/MyEtherWallet/mew-signer-hs#readme"
 }
