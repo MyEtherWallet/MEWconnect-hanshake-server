@@ -9,71 +9,52 @@ let checkNumber, offerMsg, socket;
 let clients = {};
 
 io.use((socket, next) => {
-  let token = socket.handshake;
-  logger("token", token);
-  //todo check for collisions, inform, and update client
-  clients[token.query.connId] = token.query.connId;
-  socket.join(token.query.connId);
-  next();
+	let token = socket.handshake;
+	clients[token.query.connId] = token.query.connId;
+	socket.join(token.query.connId);
+	next();
 });
 
-
 io.use((socket, next) => {
-  next();
+	next();
 });
 
 io.on("connection", connect);
 
 http.listen(port, () => {
-  logger("Listening on " + port);
+	logger("Listening on " + port);
 });
 
-
 function connect(socket) {
-  let rooms = Object.keys(socket.rooms);
-  logger("rooms", rooms);
-  logger("connected");
+	let rooms = Object.keys(socket.rooms);
+	socket.on("check", check);
 
-  logger(socket.id);
-  socket.on("check", check);
+	socket.on("offer", onOffer);
 
-  socket.on("offer", onOffer);
+	socket.on("answer", msg => {
+		io.emit("answer", msg);
+	});
 
-  socket.on("answer", msg => {
-    io.emit("answer", msg);
-  });
+	socket.on("disconnect", function(reason) {
+		logger(reason);
+	});
 
-  socket.on("disconnect", function(reason){
-    logger(reason);
-  });
+	function check(num) {
+		socket.emit("offer", offerMsg);
+	}
 
-
-  function check(num) {
-    logger("check number", num);
-    if (Number.parseInt(num.data, 10) === checkNumber) {
-      logger("Confirmation Success");
-      socket.emit("offer", offerMsg);
-    } else {
-      logger("Confirmation Fail");
-      socket.emit("confirmFail", {data: "confirmFail"});
-    }
-  }
-
-  function onOffer(msg) {
-    checkNumber = msg.confirm;
-    offerMsg = msg.data;
-    logger("checkNumber", checkNumber);
-  }
+	function onOffer(msg) {
+		checkNumber = msg.confirm;
+		offerMsg = msg.data;
+	}
 }
 
-
 function logger(tag, content) {
-  if(!content){
-    console.log(tag);
-  } else {
-    console.log(tag, content)
-  }
-
+	if (!content) {
+		console.log(tag);
+	} else {
+		console.log(tag, content);
+	}
 }
 
 //========================================= Experiment =======================================
