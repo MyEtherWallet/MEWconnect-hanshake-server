@@ -1,73 +1,111 @@
 "use strict";
 
 // const socket = io.connect("https://salty-ocean-27014.herokuapp.com/");
-const socket = io.connect("http://localhost:3001");
+
 let connectionState = document.getElementById("connState");
 let disconnectBtn = document.getElementById("disconnect");
+let initiateRTCBtn = document.getElementById("initiateRTC");
 let testRTCBtn = document.getElementById("testRTC");
+let checkNumber = document.getElementById("checkNumber");
+let begin = document.getElementById("begin");
+let sendRtcMessageBtn = document.getElementById("sendRtcMessage");
 
-let p, send;
 
+initiateRTCBtn.disabled = true;
 disconnectBtn.disabled = true;
 testRTCBtn.disabled = true;
+begin.disabled = false;
+sendRtcMessageBtn.disabled = true;
+
+
+begin
+  .addEventListener("click", initiateSocketConnection);
+
+initiateRTCBtn
+  .addEventListener("click", initiateRtcConnection);
+
+
+sendRtcMessageBtn
+  .addEventListener("click", function(){
+    sendRtcMessage(document.getElementById("rtcMessageInput").value);
+    document.getElementById("rtcMessageInput").value = "";
+  });
 
 testRTCBtn
   .addEventListener("click", testRTC);
 
-disconnectBtn
-  .addEventListener("click", disconnectRTC);
-
-socket.on('offer', recieveOffer);
+disconnectBtn.addEventListener("click", disconnectRTC);
 
 
-function recieveOffer(data) {
-  console.log(data);
-  p = new SimplePeer({initiator: false, trickle: false});
-  p.signal(JSON.parse(data.data));
+function initiateSocketConnection(){
+  socket = initiatorCall("http://localhost:3001");
+}
 
-  p.on('error', function (err) {
-    logger("error", err)
-  });
+function initiateRtcConnection(){
+  initiateRTC(socket, signalListener(socket));
+}
 
-  p.on('connect', function () {
-    logger("CONNECT", "ok");
-    connectionState.textContent = "WebRTC Connected";
-    p.send('From Web');
-    socket.disconnect();
-  });
-
-  p.on('data', function (data) {
-    logger("peer2 data", data.toString());
-  });
-
-  p.on('close', function (data){
-    connectionState.textContent = "Connection Closed";
-    disconnectBtn.disabled = true;
-    testRTCBtn.disabled = true;
-  });
-
-  p.on('signal', function (data) {
-    logger("signal", JSON.stringify(data));
+function signalListener(socket){
+  initiateRtcButtonState();
+  return function offerEmmiter(data){
+    logger('SIGNAL', JSON.stringify(data));
     send = JSON.stringify(data);
-    socket.emit('answer', {data: send});
-    disconnectBtn.disabled = false;
-    testRTCBtn.disabled = false;
-  })
+    let random = randomNumber();
+    // checkNumber.textContent = random.toString(10);
+    console.log(random);
+    socket.emit('offer', {data: send, confirm: random});
+  }
 }
 
+document.addEventListener("checkNumber", function(event){
+  checkNumber.textContent = event.detail;
+  console.log(event);
+});
+document.addEventListener("SocketConnectedEvent", initiateSocketButtonState);
+document.addEventListener("RtcInitiatedEvent", initiateRtcButtonState);
+document.addEventListener("RtcConnectedEvent", rtcConnectButtonState);
+document.addEventListener("RtcDisconnectEvent", disconnectRtcButtonState);
+document.addEventListener("RtcClosedEvent", rtcCloseButtonState);
+document.addEventListener("RtcMessageEvent", function(evt){
+  console.log(evt);
+  document.getElementById("RtcMessage").textContent = evt.detail;
+});
 
-
-function testRTC(){
-  p.send("Sent Via RTC From Web Peer");
-}
-
-function disconnectRTC(){
+function initiateSocketButtonState(){
+  initiateRTCBtn.disabled = false;
   disconnectBtn.disabled = true;
   testRTCBtn.disabled = true;
-  p.destroy();
+  begin.disabled = true;
+}
+
+function initiateRtcButtonState(){
+  initiateRTCBtn.disabled = true;
+  disconnectBtn.disabled = false;
+  testRTCBtn.disabled = false;
+  begin.disabled = true;
+}
+
+function rtcConnectButtonState(){
+  connectionState.textContent = "WebRTC Connected";
+  sendRtcMessageBtn.disabled = false;
+}
+
+function rtcCloseButtonState(){
+  document.getElementById("connState").textContent = "Connection Closed";
+  checkNumber.textContent = '';
+  sendRtcMessageBtn.disabled = true;
+  initiateRTCBtn.disabled = true;
+  disconnectBtn.disabled = true;
+  testRTCBtn.disabled = true;
+  begin.disabled = false;
 }
 
 
-function logger(tag, err){
-  console.log(tag, err)
+function disconnectRtcButtonState(){
+  checkNumber.textContent = '';
+  initiateRTCBtn.disabled = false;
+  disconnectBtn.disabled = true;
+  testRTCBtn.disabled = true;
 }
+
+

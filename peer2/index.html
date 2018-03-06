@@ -1,29 +1,41 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>PEER 2</title>
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font: 13px Helvetica, Arial; }
-      form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
-      form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
-      form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
-      #messages { list-style-type: none; margin: 0; padding: 0; }
-      #messages li { padding: 5px 10px; }
-      #messages li:nth-child(odd) { background: #eee; }
-    </style>
-  </head>
-  <body>
-  <h1>Mobile Peer</h1>
-    <ul id="messages"></ul>
-  <h3 id="connState"></h3>
-  <button type="button" id="testRTC">TestRTC</button>
-    <button type="button" id="disconnect" > disconnect</button>
-    <button type="button" id="initiateRTC" > InitiateRTC</button>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/adapterjs/0.15.0/adapter.min.js"></script>
-    <script src="https://cdn.rawgit.com/feross/simple-peer/e82b85b6/simplepeer.min.js"></script>
-
-    <script src="./main.js"></script>
-  </body>
+<head>
+  <title>PEER 2</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font: 13px Helvetica, Arial; position: relative; left: 25%; }
+    form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+    form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
+    form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+    #messages { list-style-type: none; margin: 0; padding: 0; }
+    #messages li { padding: 5px 10px; }
+    #messages li:nth-child(odd) { background: #eee; }
+  </style>
+</head>
+<body>
+<h1>Web Peer</h1>
+<ul id="messages"></ul>
+<h3 id="connState"></h3>
+<button type="button" id="disconnect"> disconnect</button>
+<button type="button" id="testRTC">TestRTC</button>
+<br>
+<input type="number" id="socketKey">
+<button id="socketKeyBtn">Begin</button>
+<br>
+<input type="number" id="confirmNumber">
+<button id="submitConfirm">Submit</button>
+<br>
+<br>
+<h2 id="RtcMessage"></h2>
+<br>
+<input type="text" id="rtcMessageInput">
+<button id="sendRtcMessage">Send</button>
+<!--<button id="begin">Begin</button>-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/adapterjs/0.15.0/adapter.min.js"></script>
+<script src="https://cdn.rawgit.com/feross/simple-peer/e82b85b6/simplepeer.min.js"></script>
+<script src="../mewPeer.js"></script>
+<script src="./main.js"></script>
+</body>
 </html>
