@@ -43,6 +43,7 @@ function signalListener(socket) {
 	return function offerEmmiter(data) {
 		logger("SIGNAL", JSON.stringify(data));
 		send = JSON.stringify(data);
+		console.log("Sending offer..");
 		socket.emit("offer", { data: send, confirm: addr });
 	};
 }
@@ -95,4 +96,78 @@ function disconnectRtcButtonState() {
 	initiateRTCBtn.disabled = false;
 	disconnectBtn.disabled = true;
 	testRTCBtn.disabled = true;
+}
+
+/*
+* begins the sequence
+* the connId is used as the socket confirm number and to identify the particular requester to
+* match the two sides of the connection
+*/
+function initiatorCall(url) {
+	let socket = io.connect(url, {
+		query: {
+			connId: addr
+		}
+	});
+	signalStateChange("SocketConnectedEvent");
+	socket.on("answer", recieveAnswer);
+	return socket;
+}
+
+/*
+* begins the rtc connection and creates the offer and rtc confirm code
+* */
+function initiateRTC(socket, signalListener) {
+	if (!signalListener) {
+		signalListener = initiatorSignalListener(socket);
+	}
+	signalStateChange("RtcInitiatedEvent");
+	p = new SimplePeer({ initiator: true, trickle: false });
+
+	p.on("error", function(err) {
+		logger("error", err);
+	});
+
+	p.on("connect", function() {
+		logger("CONNECT", "ok");
+		p.send("From Mobile");
+		signalStateChange("RtcConnectedEvent");
+		socket.disconnect();
+	});
+
+	p.on("close", function(data) {
+		signalStateChange("RtcClosedEvent");
+	});
+
+	p.on("data", function(data) {
+		console.log("data", data);
+		try {
+			let jData = JSON.parse(data);
+			// handleJData(jData);
+		} catch (e) {
+			let recdData = data.toString();
+			logger("peer1 data", recdData);
+		}
+	});
+
+	p.on("signal", signalListener);
+}
+
+/*
+* creates the confirm number and emits it along with the rtc confirm code to the server
+*/
+
+function initiatorSignalListener(socket) {
+	return function offerEmmiter(data) {
+		logger("SIGNAL", JSON.stringify(data));
+		send = JSON.stringify(data);
+		socket.emit("offer", { data: send, confirm: addr });
+	};
+}
+
+/*
+* Used by the initiator to accept the rtc offer's answer
+*/
+function recieveAnswer(data) {
+	p.signal(JSON.parse(data.data));
 }

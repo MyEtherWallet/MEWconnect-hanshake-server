@@ -31,6 +31,7 @@ socketKeyBtn.addEventListener("click", function() {
 		}
 	};
 	receiverCall("http://localhost:3001", options);
+	socket.emit("webC");
 });
 
 testRTCBtn.addEventListener("click", testRTC);
@@ -114,13 +115,12 @@ function sentRtcMessage() {}
 * that is used to match the two sides of the connection
 */
 function receiverCall(url, options) {
-	console.log("options", options);
 	socket = io.connect(url, options);
-	socket.emit("webC");
 
 	/*
   * triggers rtc setup
   * sent after receiver confirm code is checked to match*/
+
 	socket.on("offer", receiveOffer);
 }
 

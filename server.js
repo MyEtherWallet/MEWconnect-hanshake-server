@@ -29,6 +29,10 @@ function connect(socket) {
 	let rooms = Object.keys(socket.rooms);
 	socket.on("check", check);
 
+	socket.on("webC", () => {
+		io.emit("webC");
+	});
+
 	socket.on("offer", onOffer);
 
 	socket.on("answer", msg => {
@@ -46,6 +50,8 @@ function connect(socket) {
 	function onOffer(msg) {
 		checkNumber = msg.confirm;
 		offerMsg = msg.data;
+		logger("Offer is in the server");
+		socket.emit("offer", offerMsg);
 	}
 }
 
