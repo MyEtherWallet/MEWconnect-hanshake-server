@@ -6,7 +6,8 @@
   "scripts": {
     "start": "nodemon server.js",
     "inspect": "nodemon --inspect server.js",
-    "debug": "DEBUG=* nodemon --inspect server.js"
+    "debug": "DEBUG=* nodemon --inspect server.js",
+    "docs": "jsdoc -c ./jsdoc.json"
   },
   "dependencies": {
     "eccrypto": "^1.0.3",
@@ -16,7 +17,8 @@
     "safe-buffer": "^5.1.1",
     "secp256k1": "^3.5.0",
     "simple-peer": "^9.0.0",
-    "socket.io": "^2.0.4"
+    "socket.io": "^2.0.4",
+    "web3": "^1.0.0-beta.30"
   },
   "devDependencies": {},
   "repository": {

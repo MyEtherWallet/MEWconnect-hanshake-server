@@ -1,7 +1,9 @@
 "use strict";
 //todo look into refactoring to accept plug-in testing data, and/or testing tools
-const http = require("http").createServer();
-const io = require("socket.io")(http);
+const server = require("http").createServer();
+const io = require("socket.io")(server, {
+  serveClient: false
+});
 const port = process.env.PORT || 3001;
 
 
@@ -12,14 +14,32 @@ let keyToConnId = utils.keyToConnId;
 let logger = utils.logger;
 
 // let checkNumber, offerMsg, pubKey;
+/**
+ * Record of current related and partial (one side connected) connection pairs including informational and confirmation details
+ * @type {Map<String, Object>}
+ */
 let clients = new Map();
 let connected = [];
 
-http.listen(port, () => {
+server.listen(port, () => {
   logger("Listening on " + port);
 });
 
-
+/**
+ * @typedef connDetails
+ * @type {object}
+ * @property {string} connId - connection id (based off of the public key)
+ * @property {buffer} pub - public key
+ * @property {buffer} pvt - private key
+ * @property {string} initiator - socket id of the connection initiating the connection
+ * @property {string} receiver - socket id of the connection receiving the connection
+ */
+/**
+ *
+ * @param {object} keys - 'map' of public private keys in the form {pub: <buffer>, pvt: <buffer>}
+ * @param {string} socketId - the socket.id of the connection initiation the interaction
+ * @returns {connDetails}
+ */
 function createConnectionEntry(keys, socketId) {
   let initDetails = {
     connId: bufferToConnId(keys.pub),
@@ -32,6 +52,12 @@ function createConnectionEntry(keys, socketId) {
   return initDetails;
 }
 
+/**
+ *
+ * @param {object} connEntry - object consisting of {{connId: <String>, pub: <buffer>, pvt: <buffer>, initiator: <String>, receiver: undefined}}
+ * @param {string} socketId - the socket.id of the connection receiving the interaction
+ * @returns {boolean}
+ */
 function updateConnectionEntry(connEntry, socketId) {
   console.log(connEntry);
   // ensure only one connection pair exists.  Cause any additional/further attempts to fail.
@@ -45,6 +71,11 @@ function updateConnectionEntry(connEntry, socketId) {
   }
 }
 
+/**
+ *
+ * @param {string} connId - the first 32 bytes of the public key (used to differentiate and relate connection pairs)
+ * @returns {connDetails | boolean}
+ */
 function locateMatchingConnection(connId) {
   if (clients.has(connId)) {
     return clients.get(connId);
@@ -63,15 +94,23 @@ function locateMatchingConnection(connId) {
 
 
 io.use((socket, next) => {
-  let token = socket.handshake;
+  // let token = socket.handshake;
   //todo check for collisions, inform, and update client
-  socket.join(token.query.connId);
+  // socket.join(token.query.connId);
   next();
 });
 
+/**
+ *  connection event.  ioConnection called for each new connection.
+ */
 io.on("connection", ioConnection);
 
-
+//<Object <Socket.io socket object>>
+/**
+ *
+ * @param {Object} socket
+ * @returns {Promise<void>}
+ */
 async function ioConnection(socket) {
   let token = socket.handshake;
   let peerConnId = token.query.connId || false;

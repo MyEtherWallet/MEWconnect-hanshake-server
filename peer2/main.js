@@ -1,7 +1,6 @@
 "use strict";
 
-// const socket = io.connect("https://salty-ocean-27014.herokuapp.com/");
-// const socket = io.connect("http://localhost:3001");
+let mewConnect = new mewConnectReceiver(signalStateChange, logger);
 let connectionState = document.getElementById("connState");
 let disconnectBtn = document.getElementById("disconnect");
 let testRTCBtn = document.getElementById("testRTC");
@@ -20,7 +19,7 @@ sendRtcMessageBtn.disabled = true;
 
 sendRtcMessageBtn
   .addEventListener("click", function(){
-    sendRtcMessage(document.getElementById("rtcMessageInput").value);
+    mewConnect.sendRtcMessage(document.getElementById("rtcMessageInput").value);
     document.getElementById("rtcMessageInput").value = "";
   });
 
@@ -32,14 +31,14 @@ socketKeyBtn
     //     // key: document.getElementById("socketKey").value,
     //     connId: document.getElementById("socketKey").value
     //   }};
-    receiverCall("ws://localhost:3001", document.getElementById("socketKey").value);
+    mewConnect.receiverCall("ws://localhost:3001", document.getElementById("socketKey").value);
   });
 
 testRTCBtn
-  .addEventListener("click", testRTC);
+  .addEventListener("click", mewConnect.testRTC());
 
 disconnectBtn
-  .addEventListener("click", disconnectRTC);
+  .addEventListener("click", mewConnect.disconnectRTC());
 
 confirmNumber
   .addEventListener("onChange", function(evt){
@@ -49,7 +48,7 @@ confirmNumber
 submit
   .addEventListener("click", function(){
     let value = confirmNumber.value;
-    submitConfirm(value);
+    // submitConfirm(value);
   });
 
 /*
@@ -116,3 +115,68 @@ function sentRtcMessage(){
 
 }
 
+// ========================== Common Functions ========================================
+
+/*
+* Emits events on the document for various stages of the process
+* Emits the numbers on the initiator side that need to be entered on the
+* receiver side to allow the connection.
+* ( otherwise they are basically just for display and user feedback purposes)
+*/
+function signalStateChange(event, data){
+  switch(event){
+    case "RtcDisconnectEvent":
+      document.dispatchEvent(new Event("RtcDisconnectEvent"));
+      break;
+    case "RtcConnectedEvent":
+      document.dispatchEvent(new Event("RtcConnectedEvent"));
+      break;
+    case "RtcClosedEvent":
+      document.dispatchEvent(new Event("RtcClosedEvent"));
+      break;
+    case "RtcInitiatedEvent":
+      document.dispatchEvent(new Event("RtcInitiatedEvent"));
+      break;
+    case "SocketConnectedEvent":
+      document.dispatchEvent(new Event("SocketConnectedEvent"));
+      break;
+    case "confirmationFailedEvent":
+      document.dispatchEvent(new Event("confirmationFailedEvent"));
+      break;
+    case "RtcSignalEvent":
+      document.dispatchEvent(new Event("RtcSignalEvent"));
+      break;
+    case "RtcMessageEvent":
+      document.dispatchEvent(new CustomEvent("RtcMessageEvent", {detail: data}));
+      break;
+    case "checkNumber":
+      document.dispatchEvent(new CustomEvent("checkNumber", {detail: data}));
+      break;
+  }
+}
+
+/*// misc. function
+function handleJData(data){
+  switch(data.type){
+    case 1:
+      console.log("handleJData", data);
+      signalStateChange("RtcMessageEvent", data.text);
+      break;
+    case 2:
+      logger("RECEIVED: ", data.text);
+      break;
+    default:
+      logger("default", data);
+      break;
+  }
+}*/
+
+// misc function
+function logger(tag, err) {
+  if(!err){
+    console.log(tag);
+  } else {
+    console.log(tag, err)
+  }
+
+}
