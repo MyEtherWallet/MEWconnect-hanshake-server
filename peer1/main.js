@@ -38,7 +38,8 @@ disconnectBtn.addEventListener("click", disconnectRTC);
 
 
 function initiateSocketConnection(){
-  socket = initiatorCall("http://localhost:3001");
+  // socket = initiatorCall("http://localhost:3001");
+  initiatorCall("ws://localhost:3001");
 }
 
 function initiateRtcConnection(){

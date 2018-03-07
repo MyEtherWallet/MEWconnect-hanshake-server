@@ -27,10 +27,12 @@ sendRtcMessageBtn
 socketKeyBtn
   .addEventListener("click", function(){
     socketKeyButtonState();
-    let options = {query: {
-        connId: document.getElementById("socketKey").value
-      }};
-    receiverCall("http://localhost:3001", options);
+    // let options = {query: {
+    //   peer: "peer2",
+    //     // key: document.getElementById("socketKey").value,
+    //     connId: document.getElementById("socketKey").value
+    //   }};
+    receiverCall("ws://localhost:3001", document.getElementById("socketKey").value);
   });
 
 testRTCBtn
@@ -50,7 +52,7 @@ submit
     submitConfirm(value);
   });
 
-
+/*
 function signalListener(socket){
   return function answerEmmiter(data){
     logger("signal", JSON.stringify(data));
@@ -58,7 +60,7 @@ function signalListener(socket){
     socket.emit('answer', {data: send});
     rtcSignalButtonState();
   }
-}
+}*/
 
 document.addEventListener("RtcDisconnectEvent", disconnectRtcButtonState);
 document.addEventListener("RtcConnectedEvent", rtcConnectButtonState);
