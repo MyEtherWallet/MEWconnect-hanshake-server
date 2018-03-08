@@ -35,7 +35,6 @@ class MewConnectReceiver{
     let p = new SimplePeer({initiator: false, trickle: false});
     this.p = p;
     p.signal(JSON.parse(data.data));
-
     p.on('error', this.onError.bind(this));
     p.on('connect', this.onConnect.bind(this));
     p.on('data', this.onData.bind(this));
@@ -43,17 +42,15 @@ class MewConnectReceiver{
     p.on('signal', this.onSignal.bind(this));
   }
 
-
   onData(data) {
     console.log("DATA RECEIVED", data.toString());
     try{
-      console.log("type:", typeof data);
       let jData = JSON.parse(data.toString());
       console.log("data as JSON:", jData);
       this.applyDatahandlers(jData);
     } catch(e){
       console.error(e);
-      this.logger("peer2 data", data, "error");
+      // this.logger("peer2 data", data, "error");
       this.applyDatahandlers(data);
     }
   }
