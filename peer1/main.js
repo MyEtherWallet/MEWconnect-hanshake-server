@@ -1,30 +1,30 @@
 "use strict";
 
 // const socket = io.connect("https://salty-ocean-27014.herokuapp.com/");
-let mewConnect = new mewConnectInitiator(signalStateChange, logger);
+let mewConnect = new MewConnectInitiator(signalStateChange, logger);
 
 let connectionState = document.getElementById("connState");
 let disconnectBtn = document.getElementById("disconnect");
-let initiateRTCBtn = document.getElementById("initiateRTC");
-let testRTCBtn = document.getElementById("testRTC");
 let checkNumber = document.getElementById("checkNumber");
 let begin = document.getElementById("begin");
 let sendRtcMessageBtn = document.getElementById("sendRtcMessage");
+let yourAddress = document.getElementById("yourAddress");
+let signedMessage = document.getElementById("signedMessage");
 
+let getAddressBtn = document.getElementById("getAddress");
+let signMessageBtn = document.getElementById("signMessage");
 
-initiateRTCBtn.disabled = true;
 disconnectBtn.disabled = true;
-testRTCBtn.disabled = true;
 begin.disabled = false;
 sendRtcMessageBtn.disabled = true;
-
 
 begin
   .addEventListener("click", initiateSocketConnection);
 
-// initiateRTCBtn
-//   .addEventListener("click", initiateRtcConnection);
-
+function initiateSocketConnection(){
+  // socket = initiatorCall("http://localhost:3001");
+  mewConnect.initiatorCall("ws://localhost:3001");
+}
 
 sendRtcMessageBtn
   .addEventListener("click", function(){
@@ -32,16 +32,28 @@ sendRtcMessageBtn
     document.getElementById("rtcMessageInput").value = "";
   });
 
+let addType = "address";
+let addMsg = "getAddress";
+let msgType = "sign";
+let signMsg = "signMessage";
+
+getAddressBtn
+  .addEventListener("click",
+    mewConnect.sendRtcMessage(addType, addMsg).bind(event, addType, addMsg));
+
+signMessageBtn
+  .addEventListener("click", mewConnect.sendRtcMessage(msgType, signMsg).bind(event, msgType, signMsg));
+
+
+let testRTCBtn = document.getElementById("testRTC");
+
 testRTCBtn
   .addEventListener("click", mewConnect.testRTC());
 
 disconnectBtn.addEventListener("click", mewConnect.disconnectRTC());
 
 
-function initiateSocketConnection(){
-  // socket = initiatorCall("http://localhost:3001");
-  mewConnect.initiatorCall("ws://localhost:3001");
-}
+
 
 
 document.addEventListener("checkNumber", function(event){
@@ -59,16 +71,12 @@ document.addEventListener("RtcMessageEvent", function(evt){
 });
 
 function initiateSocketButtonState(){
-  initiateRTCBtn.disabled = false;
   disconnectBtn.disabled = true;
-  testRTCBtn.disabled = true;
   begin.disabled = true;
 }
 
 function initiateRtcButtonState(){
-  initiateRTCBtn.disabled = true;
   disconnectBtn.disabled = false;
-  testRTCBtn.disabled = false;
   begin.disabled = true;
 }
 
@@ -81,20 +89,44 @@ function rtcCloseButtonState(){
   document.getElementById("connState").textContent = "Connection Closed";
   checkNumber.textContent = '';
   sendRtcMessageBtn.disabled = true;
-  initiateRTCBtn.disabled = true;
   disconnectBtn.disabled = true;
-  testRTCBtn.disabled = true;
   begin.disabled = false;
 }
 
 
 function disconnectRtcButtonState(){
   checkNumber.textContent = '';
-  initiateRTCBtn.disabled = false;
   disconnectBtn.disabled = true;
-  testRTCBtn.disabled = true;
 }
 
+
+//============================== Message Middleware ========================
+
+
+mewConnect.use((data, next) => {
+  if(data.type === "address"){
+    console.log(data);
+    yourAddress.textContent = data.data;
+  } else {
+    next();
+  }
+});
+
+
+mewConnect.use((data, next) => {
+  if(data.type === "sign"){
+    try{
+      let signed = JSON.parse(data.data);
+      console.log(signed);
+      signedMessage.textContent = data.data;
+    } catch (e){
+      console.error("RAW data:", data);
+    }
+
+  } else {
+    next();
+  }
+});
 
 // ========================== Common Functions ========================================
 
@@ -136,21 +168,6 @@ function signalStateChange(event, data){
   }
 }
 
-/*// misc. function
-function handleJData(data){
-  switch(data.type){
-    case 1:
-      console.log("handleJData", data);
-      signalStateChange("RtcMessageEvent", data.text);
-      break;
-    case 2:
-      logger("RECEIVED: ", data.text);
-      break;
-    default:
-      logger("default", data);
-      break;
-  }
-}*/
 
 // misc function
 function logger(tag, err) {

@@ -8,10 +8,7 @@ const port = process.env.PORT || 3001;
 
 
 let mewCrypto = require("./mewCrypto");
-let utils = require("./utils");
-let bufferToConnId = utils.bufferToConnId;
-let keyToConnId = utils.keyToConnId;
-let logger = utils.logger;
+
 
 // let checkNumber, offerMsg, pubKey;
 /**
@@ -174,4 +171,21 @@ async function ioConnection(socket) {
 }
 
 
+//======= Utility Functions ==============
+
+function bufferToConnId(buf) {
+  return buf.toString("hex").slice(32);
+}
+
+function keyToConnId(key) {
+  return key.slice(32)
+}
+
+function logger(tag, content) {
+  if (!content) {
+    console.log(tag);
+  } else {
+    console.log(tag, content)
+  }
+}
 

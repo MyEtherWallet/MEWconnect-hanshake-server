@@ -1,9 +1,50 @@
 "use strict";
+//==================================================================
+// DEV USER VARIABLES
 
-let mewConnect = new mewConnectReceiver(signalStateChange, logger);
+let devWallet = {
+  privateKey: "cc8cdea919c19781a971b4c290d27dec25d503b611abff7b725051e220cab5f6",
+  publicKey: "0xa285efbee9bd70e1f595b880b00e112a9c7d126370e31e297833c76fa77c8fc2d4fe5087be7803e38c81f4e05c78e6c70323586fb77cf57189b544d8756949dd",
+  password: "123456789",
+
+  V3: {
+    "version": 3,
+    "id": "dd9e92fa-17d6-4449-a7d6-488109deb5b2",
+    "address": "a842d06bb63912e6062b6be8d7095e603bc58b9d",
+    "Crypto": {
+      "ciphertext": "2867d6310ef4146bbf79f5c138be7d8595d270265ee2993dc344555050bcade4",
+      "cipherparams": {"iv": "f744630c7fdbf7647a161c55b8e01ff7"},
+      "cipher": "aes-128-ctr",
+      "kdf": "scrypt",
+      "kdfparams": {
+        "dklen": 32,
+        "salt": "ffbd991f8d317d4a6ec687f7b7f5f4b5c2374a5e8bb197283b1291ef1e1aebf7",
+        "n": 8192,
+        "r": 8,
+        "p": 1
+      },
+      "mac": "b760ad4cebb72504f207669c3353d671886b6ed177778f0c137891e19aaf8e73"
+    }
+  }
+};
+
+let v2Signed = {
+  "address": "0xa842d06bb63912e6062b6be8d7095e603bc58b9d",
+  "msg": "signMessage",
+  "sig": "0xf1168923b0f014cd5b41b4bbe2039f2f69bd88c4009d38700422749a308ea7057c842e81caf039edc22c8ffd4e4dd36bfdbbc018b1dd8ccf451e6c99be056b001b",
+  "version": "3",
+  "signer": "MEW"
+}
+function getDevWallet() {
+  return devWallet;
+}
+
+//==================================================================
+
+let mewConnect = new MewConnectReceiver(signalStateChange, logger);
+
 let connectionState = document.getElementById("connState");
 let disconnectBtn = document.getElementById("disconnect");
-let testRTCBtn = document.getElementById("testRTC");
 let confirmNumber = document.getElementById("confirmNumber");
 let submit = document.getElementById("submitConfirm");
 // let begin = document.getElementById("begin");
@@ -12,7 +53,6 @@ let sendRtcMessageBtn = document.getElementById("sendRtcMessage");
 // let socket;
 
 disconnectBtn.disabled = true;
-testRTCBtn.disabled = true;
 submit.disabled = true;
 socketKeyBtn.disabled = false;
 sendRtcMessageBtn.disabled = true;
@@ -26,16 +66,10 @@ sendRtcMessageBtn
 socketKeyBtn
   .addEventListener("click", function(){
     socketKeyButtonState();
-    // let options = {query: {
-    //   peer: "peer2",
-    //     // key: document.getElementById("socketKey").value,
-    //     connId: document.getElementById("socketKey").value
-    //   }};
     mewConnect.receiverCall("ws://localhost:3001", document.getElementById("socketKey").value);
   });
 
-testRTCBtn
-  .addEventListener("click", mewConnect.testRTC());
+
 
 disconnectBtn
   .addEventListener("click", mewConnect.disconnectRTC());
@@ -51,15 +85,11 @@ submit
     // submitConfirm(value);
   });
 
-/*
-function signalListener(socket){
-  return function answerEmmiter(data){
-    logger("signal", JSON.stringify(data));
-    send = JSON.stringify(data);
-    socket.emit('answer', {data: send});
-    rtcSignalButtonState();
-  }
-}*/
+
+let testRTCBtn = document.getElementById("testRTC");
+testRTCBtn
+  .addEventListener("click", mewConnect.testRTC());
+
 
 document.addEventListener("RtcDisconnectEvent", disconnectRtcButtonState);
 document.addEventListener("RtcConnectedEvent", rtcConnectButtonState);
@@ -72,7 +102,6 @@ document.addEventListener("RtcMessageEvent", function(evt){
 
 function socketKeyButtonState(){
   disconnectBtn.disabled = true;
-  testRTCBtn.disabled = true;
   submit.disabled = false;
   socketKeyBtn.disabled = true;
 }
@@ -88,14 +117,12 @@ function rtcCloseButtonState(){
   document.getElementById("socketKey").value = '';
   confirmNumber.value = '';
   disconnectBtn.disabled = true;
-  testRTCBtn.disabled = true;
   sendRtcMessageBtn.disabled = true;
   socketKeyBtn.disabled = false;
 }
 
 function rtcSignalButtonState(evt){
   disconnectBtn.disabled = false;
-  testRTCBtn.disabled = false;
   submit.disabled = true;
   socketKeyBtn.disabled = true;
 }
@@ -104,16 +131,49 @@ function disconnectRtcButtonState(){
   document.getElementById("socketKey").value = '';
   confirmNumber.value = '';
   disconnectBtn.disabled = true;
-  testRTCBtn.disabled = true;
 }
 
 function confirmedState(){
   connectionState.textContent = "Confirmation Failed";
 }
 
-function sentRtcMessage(){
 
-}
+//============================== Message Middleware ========================
+
+let addType = "address";
+let addResp = "user address";
+let msgType = "sign";
+let msgResp = "Signed Message";
+
+mewConnect.use((data, next) => {
+  if(data.type === "address"){
+    // let cred = getDevWallet();
+    let address = getAddress(devWallet.privateKey);
+    // console.log("Receiver found address:", address);
+    mewConnect.sendRtcMessageResponse(addType, address);
+    // console.log("GET ADDRESS:", data);
+    // console.log("RESPONSE", addType, addResp);
+  } else {
+    next();
+  }
+});
+
+
+mewConnect.use((data, next) => {
+  if(data.type === "sign"){
+    // console.log("SIGN MESSAGE:", data);
+    // console.log("RESPONSE", msgType, msgResp);
+    signMessage(data.msg, devWallet.privateKey)
+      .then(signedmessage => {
+        mewConnect.sendRtcMessageResponse(msgType, signedmessage);
+      })
+      .catch(err => {
+        console.error(err);
+      })
+  } else {
+    next();
+  }
+});
 
 // ========================== Common Functions ========================================
 
@@ -155,28 +215,22 @@ function signalStateChange(event, data){
   }
 }
 
-/*// misc. function
-function handleJData(data){
-  switch(data.type){
-    case 1:
-      console.log("handleJData", data);
-      signalStateChange("RtcMessageEvent", data.text);
-      break;
-    case 2:
-      logger("RECEIVED: ", data.text);
-      break;
-    default:
-      logger("default", data);
-      break;
-  }
-}*/
-
 // misc function
-function logger(tag, err) {
-  if(!err){
-    console.log(tag);
+function logger(tag, err, type) {
+  if(type){
+    if(type === "error"){
+      if(!err){
+        console.error(tag);
+      } else {
+        console.error(tag, err)
+      }
+    }
   } else {
-    console.log(tag, err)
+    if(!err){
+      console.info(tag);
+    } else {
+      console.info(tag, err)
+    }
   }
 
 }

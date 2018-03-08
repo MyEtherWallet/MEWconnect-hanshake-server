@@ -1,6 +1,4 @@
 
-
-
 // ========================== Initiator  ========================================
 /*
 * begins the sequence
@@ -8,11 +6,12 @@
 * match the two sides of the connection
 */
 
-class mewConnectInitiator{
+class MewConnectInitiator{
   constructor(uiCommunicatorFunc, loggingFunc){
 
     this.uiCommunicatorFunc = uiCommunicatorFunc || function(arg1, arg2){};
     this.logger = loggingFunc || function(arg1, arg2){};
+    this.middleware = [];
   }
 
   initiatorCall(url){
@@ -83,19 +82,21 @@ class mewConnectInitiator{
     }.bind(this));
 
     p.on('close', function (data) {
-      this.uiCommunicator("RtcClosedEvent");
+      this.uiCommunicator("RtcClosedEvent", data);
     }.bind(this));
 
     p.on('data', function (data) {
-      this.logger("data", data);
+      console.log("DATA RECEIVED", data.toString());
       try{
         let jData = JSON.parse(data);
-        // handleJData(jData);
+        this.applyDatahandlers(jData);
       } catch(e){
-        let recdData = data.toString();
-        this.logger("peer1 data", recdData);
+        console.error(e);
+        this.logger("peer2 data", data.toString());
+        this.applyDatahandlers(data);
       }
     }.bind(this));
+
 
     p.on('signal', signalListener.bind(this));
 
@@ -112,6 +113,7 @@ class mewConnectInitiator{
     }
   }
 
+
   // sends a hardcoded message through the rtc connection
   testRTC(msg) {
     return function(){
@@ -120,10 +122,12 @@ class mewConnectInitiator{
   }
 
 // sends a message through the rtc connection
-  sendRtcMessage(msg) {
+  sendRtcMessage(type, msg) {
+    console.log("peer 1 send rtc message", type, msg);
     return function(){
+    //   console.log(stuff);
       console.log(msg);
-      this.p.send(JSON.stringify({type: 1, text: msg}));
+      this.p.send(JSON.stringify({type: type, data: msg}));
     }.bind(this);
   }
 
@@ -136,11 +140,42 @@ class mewConnectInitiator{
       this.p.destroy();
     }.bind(this);
   }
+
+
+
   /*
   * Used by the initiator to accept the rtc offer's answer
   */
   recieveAnswer(data) {
     this.p.signal(JSON.parse(data.data));
+  }
+
+  use(func){
+    this.middleware.push(func);
+  }
+
+  useDataHandlers(input, fn){
+    var fns = this.middleware.slice(0);
+    if (!fns.length) return fn(null);
+
+    function run(i){
+      fns[i](input, function(err){
+        // upon error, short-circuit
+        if (err) return fn(err);
+
+        // if no middleware left, summon callback
+        if (!fns[i + 1]) return fn(null);
+
+        // go on to next
+        run(i + 1);
+      });
+    }
+    run(0);
+  }
+
+  applyDatahandlers(data){
+    let next = function(args){return args;}; // function that runs after all middleware
+    this.useDataHandlers(data, next);
   }
 
   /*
@@ -152,110 +187,6 @@ class mewConnectInitiator{
 
 }
 
-// ========================== Receiver ========================================
-
-
-class mewConnectReceiver{
-  constructor(uiCommunicatorFunc, loggingFunc){
-    // this.io = io;
-    this.uiCommunicatorFunc = uiCommunicatorFunc || function(arg1, arg2){};
-    this.logger = loggingFunc || function(arg1, arg2){};
-  }
-
-  receiverCall(url, connId) {
-    let options = {query: {
-        peer: "peer2",
-        connId: connId
-      }};
-    this.socketKey = this.keyToConnId(connId);
-    console.log("options", options);
-    this.socketManager = io(url, options);
-    this.socket = this.socketManager.connect();
-
-    /*
-    * triggers rtc setup
-    * sent after receiver confirm code is checked to match*/
-    this.socket.on('offer', this.receiveOffer.bind(this));
-  }
-
-  receiveOffer(data) {
-    this.logger(data);
-    let p = new SimplePeer({initiator: false, trickle: false});
-    this.p = p;
-    p.signal(JSON.parse(data.data));
-
-    p.on('error', function (err) {
-      this.logger("error: ", err)
-    }.bind(this));
-
-    p.on('connect', function () {
-      this.logger("CONNECTED");
-      p.send('From Web');
-      this.uiCommunicator("RtcConnectedEvent");
-      this.socket.emit("rtcConnected", this.socketKey);
-      this.socket.disconnect();
-    }.bind(this));
-
-    p.on('data', function (data) {
-      try{
-        let jData = JSON.parse(data);
-        // handleJData(jData);
-      } catch(e){
-        this.logger("peer2 data", data.toString());
-      }
-
-    }.bind(this));
-
-    p.on('close', function (data) {
-      this.uiCommunicator("RtcClosedEvent");
-    }.bind(this));
-
-    p.on('signal', function (data){
-      this.logger("signal: ", JSON.stringify(data));
-      let send = JSON.stringify(data);
-      this.socket.emit('answerSignal', {data: send, connId: this.socketKey});
-      this.uiCommunicator("RtcSignalEvent");
-    }.bind(this));
-  }
-
-// sends a hardcoded message through the rtc connection
-  testRTC(msg) {
-    return function(){
-      this.p.send(JSON.stringify({type: 2, text: msg}));
-    }.bind(this);
-  }
-
-// sends a message through the rtc connection
-  sendRtcMessage(msg) {
-    return function(){
-      console.log(msg);
-      this.p.send(JSON.stringify({type: 1, text: msg}));
-    }.bind(this);
-  }
-
-  /*
-  * Disconnect the current RTC connection
-  */
-  disconnectRTC() {
-    return function(){
-      this.uiCommunicator("RtcDisconnectEvent");
-      this.p.destroy();
-    }.bind(this);
-  }
-
-  /*
-* allows external function to listen for lifecycle events
-*/
-  uiCommunicator(event, data){
-    return data ? this.uiCommunicatorFunc(event, data) : this.uiCommunicatorFunc(event);
-  }
-
-  // extracts portion of key used as the connection id
-  keyToConnId(key){
-    return key.slice(32);
-  }
-
+if(!window){
+  module.exports = mewConnectInitiator;
 }
-
-
-
