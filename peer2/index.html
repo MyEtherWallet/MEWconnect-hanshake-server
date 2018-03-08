@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Web peer</title>
+</head>
+<body>
+<h1>Web Peer</h1>
+<ul id="messages"></ul>
+<h3 id="connState"></h3>
+<button type="button" id="disconnect"> disconnect</button>
+<button type="button" id="testRTC">TestRTC</button>
+<br>
+<input type="text" id="socketKey">
+<button id="socketKeyBtn">Begin</button>
+<br>
+<input type="text" id="confirmNumber">
+<button id="submitConfirm">Submit</button>
+<br>
+<br>
+<h2 id="RtcMessage"></h2>
+<br>
+<input type="text" id="rtcMessageInput">
+<button id="sendRtcMessage">Send</button>
+<!--<button id="begin">Begin</button>-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/adapterjs/0.15.0/adapter.min.js"></script>
+<script src="https://cdn.rawgit.com/feross/simple-peer/e82b85b6/simplepeer.min.js"></script>
+<script src="../mewPeer.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>
