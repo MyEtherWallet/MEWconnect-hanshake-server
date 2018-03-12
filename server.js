@@ -1,86 +1,44 @@
 "use strict";
 //todo look into refactoring to accept plug-in testing data, and/or testing tools
-const server = require("http").createServer();
+
+const fs = require('fs');
+const path = require("path");
+let options;
+if(process.env.LOGNAME === "ubuntu"){
+    options = {
+        key: fs.readFileSync("/home/ubuntu/mew-signer-hs/test/simpleExpressTestServer/devCert.key"),
+        cert: fs.readFileSync("/home/ubuntu/mew-signer-hs/test/simpleExpressTestServer/devCert.cert"),
+        requestCert: false,
+        rejectUnauthorized: false
+    };
+} else {
+    options = {
+        key: fs.readFileSync(path.join("test/simpleExpressTestServer/devCert.key")),
+        cert: fs.readFileSync(path.join("test/simpleExpressTestServer/devCert.cert")),
+        requestCert: false,
+        rejectUnauthorized: false
+    };
+}
+
+const server = require('https').createServer(options);
+// const server = require("http").createServer();
 const io = require("socket.io")(server, {
-  serveClient: false
+    serveClient: false,
+    secure: true
 });
 const port = process.env.PORT || 3001;
-
-
-let mewCrypto = require("./mewCrypto");
-
+let mewCrypto = require("./serverMewCrypto");
+let ServerConnection = require("./serverConnection");
 
 // let checkNumber, offerMsg, pubKey;
-/**
- * Record of current related and partial (one side connected) connection pairs including informational and confirmation details
- * @type {Map<String, Object>}
- */
+
 let clients = new Map();
 let connected = [];
 
 server.listen(port, () => {
-  logger("Listening on " + port);
+    logger("Listening on " + port);
 });
 
-/**
- * @typedef connDetails
- * @type {object}
- * @property {string} connId - connection id (based off of the public key)
- * @property {buffer} pub - public key
- * @property {buffer} pvt - private key
- * @property {string} initiator - socket id of the connection initiating the connection
- * @property {string} receiver - socket id of the connection receiving the connection
- */
-/**
- *
- * @param {object} keys - 'map' of public private keys in the form {pub: <buffer>, pvt: <buffer>}
- * @param {string} socketId - the socket.id of the connection initiation the interaction
- * @returns {connDetails}
- */
-function createConnectionEntry(keys, socketId) {
-  let initDetails = {
-    connId: bufferToConnId(keys.pub),
-    pub: keys.pub,
-    pvt: keys.pvt,
-    initiator: socketId,
-    receiver: undefined
-  };
-  clients.set(bufferToConnId(keys.pub), initDetails);
-  return initDetails;
-}
-
-/**
- *
- * @param {object} connEntry - object consisting of {{connId: <String>, pub: <buffer>, pvt: <buffer>, initiator: <String>, receiver: undefined}}
- * @param {string} socketId - the socket.id of the connection receiving the interaction
- * @returns {boolean}
- */
-function updateConnectionEntry(connEntry, socketId) {
-  console.log(connEntry);
-  // ensure only one connection pair exists.  Cause any additional/further attempts to fail.
-  if (connEntry.receiver) {
-    return false;
-  } else {
-    // update connection entry with socket id of receiver connection
-    connEntry.receiver = socketId;
-    clients.set(connEntry.connId, connEntry);
-    return true;
-  }
-}
-
-/**
- *
- * @param {string} connId - the first 32 bytes of the public key (used to differentiate and relate connection pairs)
- * @returns {connDetails | boolean}
- */
-function locateMatchingConnection(connId) {
-  if (clients.has(connId)) {
-    return clients.get(connId);
-  } else {
-    console.error("NO MATCHING CONNECTION");
-    return false;
-  }
-}
 
 // io.use((socket, next) => {
 //   logger("-------------------- exchange Listener --------------------");
@@ -89,103 +47,164 @@ function locateMatchingConnection(connId) {
 //   next();
 // });
 
-
 io.use((socket, next) => {
-  // let token = socket.handshake;
-  //todo check for collisions, inform, and update client
-  // socket.join(token.query.connId);
-  next();
+    //todo check for collisions, inform, and update client
+    next();
 });
 
-/**
- *  connection event.  ioConnection called for each new connection.
- */
+
 io.on("connection", ioConnection);
 
-//<Object <Socket.io socket object>>
-/**
- *
- * @param {Object} socket
- * @returns {Promise<void>}
- */
-async function ioConnection(socket) {
-  let token = socket.handshake;
-  let peerConnId = token.query.connId || false;
-  if (peerConnId) {
-    let connDetails = locateMatchingConnection(keyToConnId(peerConnId));
-    if (connDetails) {
-      logger(peerConnId);
-      if (mewCrypto.verifyKey(peerConnId, connDetails.pvt)) {
-        socket.join(keyToConnId(peerConnId));
-        logger("PAIR CONNECTION VERIFIED");
-        let canUpdate = updateConnectionEntry(connDetails, socket.id);
-        console.log(canUpdate);
-        if(canUpdate) {
-          socket.to(keyToConnId(peerConnId)).emit("confirmation", {connId: connDetails.connId}) // emit #2  confirmation (listener: initiator peer)
-        } else {
-          socket.to(keyToConnId(peerConnId)).emit("confirmationFailedBusy"); // emit confirmationFailedBusy
+
+function ioConnection(socket) {
+    try {
+        let token = socket.handshake.query;
+        let connector = token.stage || false;
+        switch (connector) {
+            case "initiator":
+                initiatorIncomming(socket, token);
+                break;
+            case "receiver":
+                receiverIncomming(socket, token);
+                break;
+            default:
+                console.log("WTF");
+                break;
         }
-      } else {
-        console.error("CONNECTION VERIFY FAILED");
-        socket.to(keyToConnId(peerConnId)).emit("confirmationFailed"); // emit confirmationFailed
-      }
-    } else {
-      logger(clients);
-      console.error("NO CONNECTION DETAILS");
-      socket.to(keyToConnId(peerConnId)).emit("InvalidConnection"); // emit InvalidConnection
+
+        socket.on("signature", data => {
+            receiverConfirm(socket, data);
+        });
+
+        socket.on("offerSignal", data => {
+            logger("OFFER", data);
+            io.to(data.connId).emit("offer", {data: data.data}); // emit #3 offer (listener: receiver peer)
+        });
+
+        socket.on("answerSignal", data => {
+            logger("answer", data);
+            io.to(data.connId).emit("answer", {data: data.data}); // emit #4 answer (listener: initiator peer)
+        });
+
+        socket.on("rtcConnected", data => {
+            let cleanUpOk = clients.delete(data);
+            if (!cleanUpOk) {
+                logger("connection details already clean or error cleaning up closed connection details");
+            } else { // not really necessary if clean up was ok
+                logger("connection details removed");
+            }
+        });
+
+        socket.on("disconnect", reason => {
+            console.log("disconnect reason", reason);
+            socket.disconnect(true);
+        })
+    } catch (e) {
+        console.error(e);
     }
+}
 
-  } else {
-    console.error("CREATING CONNECTION");
-    let keyPair = await mewCrypto.prepareKey();
-    let details = await createConnectionEntry(keyPair, socket.id);
-    socket.join(details.connId);
-    io.to(details.connId).emit("handshake", {connId: details.connId, key: keyPair.pub.toString("hex")}) // emit #1 handshake  (listener: initiator peer)
-  }
-
-  socket.on("offerSignal", (data) => {
-    logger("OFFER", data);
-    io.to(data.connId).emit("offer", {data: data.data}); // emit #3 offer (listener: receiver peer)
-  });
-
-  socket.on("answerSignal", (data) => {
-    logger("answer", data);
-    io.to(data.connId).emit("answer", {data: data.data}); // emit #4 answer (listener: initiator peer)
-  });
-
-  socket.on("rtcConnected", (data) =>{
-    let cleanUpOk = clients.delete(data);
-    if(!cleanUpOk){
-      logger("connection details already clean or error cleaning up closed connection details");
-    } else { // not really necessary if clean up was ok
-      logger("connection details removed");
+function initiatorIncomming(socket, details) {
+    try {
+        console.error("CREATING CONNECTION");
+        console.log("CREATING DETAILS: ", details);
+        createConnectionEntry(details, socket.id);
+        socket.join(details.connId);
+    } catch (e) {
+        console.error(e);
     }
-  });
+}
 
-  socket.on("disconnect", (reason) => {
-    console.log("disconnect reason", reason);
-    socket.disconnect(true);
-    // console.log(socket);
-  })
+function receiverIncomming(socket, details) {
+    try {
+        console.error("RECEIVER CONNECTION");
+        let connInstance = locateMatchingConnection(details.connId);
+        if (connInstance) {
+            socket.emit("handshake", {toSign: connInstance.message}) // emit #1 handshake  (listener: receiver peer)
+        } else {
+            logger(clients);
+            console.error("NO CONNECTION DETAILS");
+            socket.emit("InvalidConnection"); // emit InvalidConnection
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function receiverConfirm(socket, details) {
+    try {
+        console.error("RECEIVER CONFIRM");
+        console.log("RECEIVER CONFIRM DETAILS: ", details);
+        let connInstance = locateMatchingConnection(details.connId);
+        logger(details.connId);
+        if (connInstance) {
+            if (connInstance.verifySig(details.signed)) {
+                socket.join(details.connId);
+                logger("PAIR CONNECTION VERIFIED");
+                let canUpdate = connInstance.updateConnectionEntry(socket.id);
+                if (canUpdate) {
+                    socket.to(details.connId).emit("confirmation", {connId: connInstance.connId}) // emit #2  confirmation (listener: initiator peer)
+                } else {
+                    socket.to(details.connId).emit("confirmationFailedBusy"); // emit confirmationFailedBusy
+                }
+            } else {
+                console.error("CONNECTION VERIFY FAILED");
+                socket.emit("confirmationFailed"); // emit confirmationFailed
+            }
+        } else {
+            logger(clients);
+            console.error("NO CONNECTION DETAILS");
+            socket.emit("InvalidConnection"); // emit InvalidConnection
+        }
+    } catch (e) {
+
+    }
 
 }
 
+
+function createConnectionEntry(details, socketId) {
+    try {
+        console.log(details);
+        details.initiator = socketId;
+        let connectionInstance = new ServerConnection(details);
+        clients.set(details.connId, connectionInstance);
+        logger(clients);
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+
+function locateMatchingConnection(connId) {
+    try {
+        logger(clients);
+        if (clients.has(connId)) {
+            return clients.get(connId);
+        } else {
+            console.error("NO MATCHING CONNECTION");
+            return false;
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
 
 //======= Utility Functions ==============
 
 function bufferToConnId(buf) {
-  return buf.toString("hex").slice(32);
+    return buf.toString("hex").slice(32);
 }
 
 function keyToConnId(key) {
-  return key.slice(32)
+    return key.slice(32)
 }
 
 function logger(tag, content) {
-  if (!content) {
-    console.log(tag);
-  } else {
-    console.log(tag, content)
-  }
+    if (!content) {
+        console.log(tag);
+    } else {
+        console.log(tag, content)
+    }
 }
 
