@@ -53,40 +53,65 @@
     </style>
 </head>
 <body>
-<h1>Initiator Peer</h1>
-<ul id="messages"></ul>
-<h3 id="connState"></h3>
-<button type="button" id="testRTC">TestRTC</button>
-<button type="button" id="disconnect"> disconnect</button>
-<!--<button type="button" id="initiateRTC" > InitiateRTC</button>-->
-<br>
-<button id="begin">Begin</button>
-<br>
-<h3 id="checkNumber"></h3>
-<br>
-<br>
-<h2 id="RtcMessage"></h2>
-<br>
-<input type="text" id="rtcMessageInput">
-<button type="button" id="sendRtcMessage">Send</button>
-<br>
-<button type="button" id="getAddress">Get Address</button>
-<br>
-<button type="button" id="signMessage">Sign Message</button>
-<br>
-<br>
-<span>Address: <span id="yourAddress"></span></span>
-<br>
-<span>Signed Message: <span id="signedMessage"></span></span>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/adapterjs/0.15.0/adapter.min.js"></script>
-<script src="https://cdn.rawgit.com/feross/simple-peer/e82b85b6/simplepeer.min.js"></script>
-<!--<script src="../vendor/etherwallet-master.js"></script>-->
-<script src="../vendor/ethUtils.js"></script>
-<script src="../vendor/ethWallet.js"></script>
-<script src="../vendor/Buffer.js"></script>
-<script src="../mewConnectUtils.js"></script>
-<script src="../mewConnectInitiator.js"></script>
-<script src="./main.js"></script>
+    <h1>Initiator Peer</h1>
+    <ul id="messages"></ul>
+    <h3 id="connState"></h3>
+    <button type="button" id="testRTC">TestRTC</button>
+    <button type="button" id="disconnect"> disconnect</button>
+    <!--<button type="button" id="initiateRTC" > InitiateRTC</button>-->
+    <br>
+    <button id="begin">Begin</button>
+    <br>
+    <br>
+    <span>Signature: <span id="createdSignature"></span></span>
+    <br>
+    <br>
+    <h3>Private: <span id="checkNumber"></span></h3>    <br>
+
+    <br>
+    <h3>connId: <span id="connId"></span></h3>
+    <br>
+    <h3>QR String: </h3>
+    <span id="qrString"></span>
+    <br>
+    <br>
+    <div id="qrcode"></div>
+    <br>
+    <button type="button" id="getAddress">Get Address</button>
+    <br>
+    <button type="button" id="signMessage">Sign Message</button>
+    <br>
+    <br>
+    <span>Address: <span id="yourAddress"></span></span>
+    <br>
+    <h2 id="RtcMessage"></h2>
+    <br>
+    <input type="text" id="rtcMessageInput">
+    <button type="button" id="sendRtcMessage">Send</button>
+    <span>Signed Message: <span id="signedMessage"></span></span>
+    <br>
+    <h2 id="RtcMessage"></h2>
+    <br>
+    <input type="text" id="rtcMessageInput">
+    <button type="button" id="sendRtcMessage">Send</button>
+    <br>
+    <script>
+        // var enviroments = "developmentLocal";
+        var enviroments = "developmentRemote";
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/adapterjs/0.15.0/adapter.min.js"></script>
+    <!--<script src="https://cdn.rawgit.com/feross/simple-peer/e82b85b6/simplepeer.min.js"></script>-->
+    <script src="../vendor/SimplePeer.js"></script>
+    <script src="../vendor/qrcode.js"></script>
+    <script src="../vendor/Crypto.js"></script>
+    <script src="../vendor/ethUtils.js"></script>
+    <script src="../vendor/ethWallet.js"></script>
+    <script src="../vendor/Buffer.js"></script>
+    <script src="../peers/mewConnectCommon.js"></script>
+    <script src="../peers/mewConnectCrypto.js"></script>
+    <script src="../peers/mewConnectUtils.js"></script>
+    <script src="../peers/mewConnectInitiator.js"></script>
+    <script src="../peer1/main.js"></script>
 </body>
 </html>

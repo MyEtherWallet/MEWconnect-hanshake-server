@@ -39,6 +39,7 @@ function getDevWallet() {
   return devWallet;
 }
 
+
 //==================================================================
 
 let mewConnect = new MewConnectReceiver(signalStateChange, logger);
@@ -46,6 +47,7 @@ let mewConnect = new MewConnectReceiver(signalStateChange, logger);
 let connectionState = document.getElementById("connState");
 let disconnectBtn = document.getElementById("disconnect");
 let confirmNumber = document.getElementById("confirmNumber");
+// let connectionId = document.getElementById("connectionId");
 let submit = document.getElementById("submitConfirm");
 // let begin = document.getElementById("begin");
 let socketKeyBtn = document.getElementById("socketKeyBtn");
@@ -57,6 +59,25 @@ submit.disabled = true;
 socketKeyBtn.disabled = false;
 sendRtcMessageBtn.disabled = true;
 
+
+document.getElementById("startScan").addEventListener("click", event => {
+    let scanner = new Instascan.Scanner({ video: document.getElementById('preview') });
+    scanner.addListener('scan', function (content) {
+        console.log(content);
+        qrConnect(content);
+    });
+    Instascan.Camera.getCameras().then(function (cameras) {
+        if (cameras.length > 0) {
+            scanner.start(cameras[1]);
+        } else {
+            alert('no cameras found');
+            console.error('No cameras found.');
+        }
+    }).catch(function (e) {
+        console.error(e);
+    });
+})
+
 sendRtcMessageBtn
   .addEventListener("click", function(){
     mewConnect.sendRtcMessage(document.getElementById("rtcMessageInput").value);
@@ -65,11 +86,45 @@ sendRtcMessageBtn
 
 socketKeyBtn
   .addEventListener("click", function(){
-    socketKeyButtonState();
-    mewConnect.receiverCall("ws://localhost:3001", document.getElementById("socketKey").value);
+      socketKeyButtonState();
+      let urlBase;
+      if(enviroments === "developmentLocal"){
+          urlBase = "localhost";
+      } else {
+          urlBase = "35.160.138.139";
+      }
+      let qrString = document.getElementById("socketKey").value;
+      console.log(qrString);
+      let connParts = qrString.split("-");
+      console.log('connParts', connParts); // todo remove debug item
+      let options = {
+          connId: connParts[1].trim(),
+          key: connParts[0].trim()
+      };
+      mewConnect.receiverCall(`https://${urlBase}:3001`, options);
+      // mewConnect.receiverCall("ws://localhost:3001", document.getElementById("connId").value);
   });
 
 
+function qrConnect(code){
+    socketKeyButtonState();
+    let urlBase;
+    if(enviroments === "developmentLocal"){
+        urlBase = "localhost";
+    } else {
+        urlBase = "35.160.138.139";
+    }
+    let qrString = code;
+    console.log(qrString);
+    let connParts = qrString.split("-");
+    console.log('connParts', connParts); // todo remove debug item
+    let options = {
+        connId: connParts[1].trim(),
+        key: connParts[0].trim()
+    };
+    mewConnect.receiverCall(`https://${urlBase}:3001`, options);
+    // mewConnect.receiverCall("ws://localhost:3001", document.getElementById("connId").value);
+}
 
 disconnectBtn
   .addEventListener("click", mewConnect.disconnectRTC());
@@ -90,7 +145,10 @@ let testRTCBtn = document.getElementById("testRTC");
 testRTCBtn
   .addEventListener("click", mewConnect.testRTC());
 
-
+document.addEventListener("signatureCheck", function (event) {
+    document.getElementById("signed").textContent = event.detail;
+    console.log(event);
+});
 document.addEventListener("RtcDisconnectEvent", disconnectRtcButtonState);
 document.addEventListener("RtcConnectedEvent", rtcConnectButtonState);
 document.addEventListener("RtcClosedEvent", rtcCloseButtonState);
@@ -114,7 +172,7 @@ function rtcConnectButtonState(evt){
 
 function rtcCloseButtonState(){
   connectionState.textContent = "Connection Closed";
-  document.getElementById("socketKey").value = '';
+  document.getElementById("connId").value = '';
   confirmNumber.value = '';
   disconnectBtn.disabled = true;
   sendRtcMessageBtn.disabled = true;
@@ -128,7 +186,7 @@ function rtcSignalButtonState(evt){
 }
 
 function disconnectRtcButtonState(){
-  document.getElementById("socketKey").value = '';
+  document.getElementById("connId").value = '';
   confirmNumber.value = '';
   disconnectBtn.disabled = true;
 }
@@ -141,18 +199,13 @@ function confirmedState(){
 //============================== Message Middleware ========================
 
 let addType = "address";
-let addResp = "user address";
 let msgType = "sign";
-let msgResp = "Signed Message";
+
 
 mewConnect.use((data, next) => {
   if(data.type === "address"){
-    // let cred = getDevWallet();
     let address = getAddress(devWallet.privateKey);
-    // console.log("Receiver found address:", address);
     mewConnect.sendRtcMessageResponse(addType, address);
-    // console.log("GET ADDRESS:", data);
-    // console.log("RESPONSE", addType, addResp);
   } else {
     next();
   }
@@ -161,8 +214,6 @@ mewConnect.use((data, next) => {
 
 mewConnect.use((data, next) => {
   if(data.type === "sign"){
-    // console.log("SIGN MESSAGE:", data);
-    // console.log("RESPONSE", msgType, msgResp);
     signMessage(data.msg, devWallet.privateKey)
       .then(signedmessage => {
         mewConnect.sendRtcMessageResponse(msgType, signedmessage);
@@ -184,35 +235,41 @@ mewConnect.use((data, next) => {
 * ( otherwise they are basically just for display and user feedback purposes)
 */
 function signalStateChange(event, data){
-  switch(event){
-    case "RtcDisconnectEvent":
-      document.dispatchEvent(new Event("RtcDisconnectEvent"));
-      break;
-    case "RtcConnectedEvent":
-      document.dispatchEvent(new Event("RtcConnectedEvent"));
-      break;
-    case "RtcClosedEvent":
-      document.dispatchEvent(new Event("RtcClosedEvent"));
-      break;
-    case "RtcInitiatedEvent":
-      document.dispatchEvent(new Event("RtcInitiatedEvent"));
-      break;
-    case "SocketConnectedEvent":
-      document.dispatchEvent(new Event("SocketConnectedEvent"));
-      break;
-    case "confirmationFailedEvent":
-      document.dispatchEvent(new Event("confirmationFailedEvent"));
-      break;
-    case "RtcSignalEvent":
-      document.dispatchEvent(new Event("RtcSignalEvent"));
-      break;
-    case "RtcMessageEvent":
-      document.dispatchEvent(new CustomEvent("RtcMessageEvent", {detail: data}));
-      break;
-    case "checkNumber":
-      document.dispatchEvent(new CustomEvent("checkNumber", {detail: data}));
-      break;
-  }
+    switch (event) {
+        case "RtcDisconnectEvent":
+            document.dispatchEvent(new Event("RtcDisconnectEvent"));
+            break;
+        case "RtcConnectedEvent":
+            document.dispatchEvent(new Event("RtcConnectedEvent"));
+            break;
+        case "RtcClosedEvent":
+            document.dispatchEvent(new Event("RtcClosedEvent"));
+            break;
+        case "RtcInitiatedEvent":
+            document.dispatchEvent(new Event("RtcInitiatedEvent"));
+            break;
+        case "SocketConnectedEvent":
+            document.dispatchEvent(new Event("SocketConnectedEvent"));
+            break;
+        case "confirmationFailedEvent":
+            document.dispatchEvent(new Event("confirmationFailedEvent"));
+            break;
+        case "RtcSignalEvent":
+            document.dispatchEvent(new Event("RtcSignalEvent"));
+            break;
+        case "RtcMessageEvent":
+            document.dispatchEvent(new CustomEvent("RtcMessageEvent", {detail: data}));
+            break;
+        case "checkNumber":
+            document.dispatchEvent(new CustomEvent("checkNumber", {detail: data}));
+            break;
+        case "ConnectionId":
+            document.dispatchEvent(new CustomEvent("ConnectionId", {detail: data}));
+            break;
+        case "signatureCheck":
+            document.dispatchEvent(new CustomEvent("signatureCheck", {detail: data}));
+            break;
+    }
 }
 
 // misc function
