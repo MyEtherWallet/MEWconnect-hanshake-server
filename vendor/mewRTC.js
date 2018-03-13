@@ -389,6 +389,7 @@ class MewRTC {
             iceConnectionState,
             iceGatheringState
         );
+        console.log("mewRTC:392 this._pc: ", this._pc); //todo remove dev item
         this.emit('iceStateChange', iceConnectionState, iceGatheringState);
 
         if (iceConnectionState === 'connected' || iceConnectionState === 'completed') {

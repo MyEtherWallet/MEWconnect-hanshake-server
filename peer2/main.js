@@ -42,7 +42,7 @@ function getDevWallet() {
 
 //==================================================================
 
-let mewConnect = new MewConnectReceiver(signalStateChange, logger);
+let mewConnect = new MewConnectReceiver(signalStateChange, logger, SimplePeer);
 
 let connectionState = document.getElementById("connState");
 let disconnectBtn = document.getElementById("disconnect");
@@ -172,8 +172,8 @@ function rtcConnectButtonState(evt){
 
 function rtcCloseButtonState(){
   connectionState.textContent = "Connection Closed";
-  document.getElementById("connId").value = '';
-  confirmNumber.value = '';
+  // document.getElementById("connId").value = '';
+  // confirmNumber.value = '';
   disconnectBtn.disabled = true;
   sendRtcMessageBtn.disabled = true;
   socketKeyBtn.disabled = false;
@@ -204,6 +204,7 @@ let msgType = "sign";
 
 mewConnect.use((data, next) => {
   if(data.type === "address"){
+console.log("main:207 data: ", data); //todo remove dev item
     let address = getAddress(devWallet.privateKey);
     mewConnect.sendRtcMessageResponse(addType, address);
   } else {
@@ -214,6 +215,7 @@ mewConnect.use((data, next) => {
 
 mewConnect.use((data, next) => {
   if(data.type === "sign"){
+      console.log("main:218 data: ", data); //todo remove dev item
     signMessage(data.msg, devWallet.privateKey)
       .then(signedmessage => {
         mewConnect.sendRtcMessageResponse(msgType, signedmessage);

@@ -47,4 +47,9 @@ class MewConnectCommon{
     uiCommunicator(event, data) {
         return data ? this.uiCommunicatorFunc(event, data) : this.uiCommunicatorFunc(event);
     }
+
+
+    // getWebRtcLibrary(){
+    //     return
+    // }
 }

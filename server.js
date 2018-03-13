@@ -26,6 +26,7 @@ const io = require("socket.io")(server, {
     serveClient: false,
     secure: true
 });
+
 const port = process.env.PORT || 3001;
 let mewCrypto = require("./serverMewCrypto");
 let ServerConnection = require("./serverConnection");

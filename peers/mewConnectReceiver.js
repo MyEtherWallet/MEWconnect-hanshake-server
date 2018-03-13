@@ -6,16 +6,9 @@ Gets the key, and connection id created via calls from MewConnectInitiator to th
  */
 
 
-class MewConnectReceiver extends MewConnectCommon {
+class MewConnectReceiver extends MewConnectSimplePeer {
     constructor(uiCommunicatorFunc, loggingFunc, peerLib) {
-        super(uiCommunicatorFunc, loggingFunc);
-        console.log(peerLib);
-        // this.io = io;
-        // this.uiCommunicatorFunc = uiCommunicatorFunc || function (arg1, arg2) {
-        // };
-        // this.logger = loggingFunc || function (arg1, arg2) {
-        // };
-        // this.middleware = [];
+        super(uiCommunicatorFunc, loggingFunc, peerLib);
 
         this.mewCrypto = new MewConnectCrypto();
     }
@@ -36,59 +29,59 @@ class MewConnectReceiver extends MewConnectCommon {
         this.socketManager = io(url, options);
         this.socket = this.socketManager.connect();
 
-        this.socket.on('offer', this.receiveOffer.bind(this));
-        this.socket.on("handshake", this.socketHandshake.bind(this))
-    }
+        this.socketOn('offer', this.receiveOffer.bind(this));
+        this.socketOn("handshake", this.socketHandshake.bind(this));
 
-    receiveOffer(data) {
-        this.logger(data);
-        let simpleOptions = {
-            initiator: false,
-            trickle: false,
-            reconnectTimer: 100,
-            iceTransportPolicy: 'relay',
-        };
-        let p = new SimplePeer(simpleOptions);
-        this.p = p;
-        p.signal(JSON.parse(data.data));
-        p.on('error', this.onError.bind(this));
-        p.on('connect', this.onConnect.bind(this));
-        p.on('data', this.onData.bind(this));
-        p.on('close', this.onClose.bind(this));
-        p.on('signal', this.onSignal.bind(this));
+        // this.socket.on('offer', this.receiveOffer.bind(this));
+        // this.socket.on("handshake", this.socketHandshake.bind(this));
     }
 
     async socketHandshake(data) {
         this.signed = await this.mewCrypto.signMessage(data.toSign);
         this.uiCommunicator("signatureCheck", this.signed);
-        this.socket.emit("signature", {signed: this.signed, connId: this.connId})
+        this.socketEmit("signature", {signed: this.signed, connId: this.connId});
+        // this.socket.emit("signature", {signed: this.signed, connId: this.connId})
     }
 
     onData(data) {
         console.log("DATA RECEIVED", data.toString());
         try {
-            let jData = JSON.parse(data.toString());
-            console.log("data as JSON:", jData);
-            this.applyDatahandlers(jData);
+            if(typeof data === "string"){
+                let jData = JSON.parse(data);
+                console.log("data as JSON:", jData);
+                this.applyDatahandlers(jData);
+            } else {
+                if(data instanceof ArrayBuffer){
+                    console.log("mewConnectReceiver:54 typeof data: ", typeof data); //todo remove dev item
+                }
+
+                let jData = JSON.parse(data.toString());
+                console.log("data as JSON:", jData);
+                this.applyDatahandlers(jData);
+            }
         } catch (e) {
             console.error(e);
-            this.applyDatahandlers(data);
+
         }
     }
 
     onSignal(data) {
         this.logger("signal: ", JSON.stringify(data));
         let send = JSON.stringify(data);
-        this.socket.emit('answerSignal', {data: send, connId: this.connId});
+
+        this.socketEmit('answerSignal', {data: send, connId: this.connId});
+        // this.socket.emit('answerSignal', {data: send, connId: this.connId});
         this.uiCommunicator("RtcSignalEvent");
     }
 
     onConnect() {
         this.logger("CONNECTED");
-        this.p.send('From Web');
+        this.rtcSend({type: "text", data: "From Web"});
+        // this.p.send('From Web');
         this.uiCommunicator("RtcConnectedEvent");
-        this.socket.emit("rtcConnected", this.connId);
-        this.socket.disconnect();
+        this.socketEmit("rtcConnected", this.connId);
+        // this.socket.emit("rtcConnected", this.connId);
+        this.socketDisconnect();
     }
 
     onClose(data) {
@@ -103,7 +96,8 @@ class MewConnectReceiver extends MewConnectCommon {
     // sends a hardcoded message through the rtc connection
     testRTC(msg) {
         return function () {
-            this.p.send(JSON.stringify({type: 2, text: msg}));
+            this.rtcSend(JSON.stringify({type: 2, text: msg}));
+            // this.p.send(JSON.stringify({type: 2, text: msg}));
         }.bind(this);
     }
 
@@ -111,14 +105,16 @@ class MewConnectReceiver extends MewConnectCommon {
     sendRtcMessage(type, msg) {
         return function () {
             console.log("peer 2 sendRtcMessage", msg);
-            this.p.send(JSON.stringify({type: type, data: msg}));
+            this.rtcSend(JSON.stringify({type: type, data: msg}));
+            // this.p.send(JSON.stringify({type: type, data: msg}));
         }.bind(this);
     }
 
     // sends a message through the rtc connection
     sendRtcMessageResponse(type, msg) {
         console.log("peer 2 sendRtcMessage", msg);
-        this.p.send(JSON.stringify({type: type, data: msg}));
+        this.rtcSend(JSON.stringify({type: type, data: msg}));
+        // this.p.send(JSON.stringify({type: type, data: msg}));
     }
 
     /*
@@ -127,11 +123,21 @@ class MewConnectReceiver extends MewConnectCommon {
     disconnectRTC() {
         return function () {
             this.uiCommunicator("RtcDisconnectEvent");
-            this.p.destroy();
+            this.rtcDestroy();
         }.bind(this);
     }
 
+    socketEmit(signal, data){
+        this.socket.emit(signal, data);
+    }
 
+    socketDisconnect(){
+        this.socket.disconnect();
+    }
+
+    socketOn(signal, func){
+        this.socket.on(signal, func);
+    }
     // send the decoded address requested by the initiator peer
     sendAddress() {
 

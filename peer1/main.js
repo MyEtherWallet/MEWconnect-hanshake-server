@@ -1,8 +1,9 @@
 "use strict";
 
 // const socket = io.connect("https://salty-ocean-27014.herokuapp.com/");
-let mewConnect = new MewConnectInitiator(signalStateChange, logger);
-
+console.log(SimplePeer);
+let mewConnect = new MewConnectInitiator(signalStateChange, logger, SimplePeer);
+console.log(SimplePeer);
 let connectionState = document.getElementById("connState");
 let disconnectBtn = document.getElementById("disconnect");
 let checkNumber = document.getElementById("checkNumber");

@@ -4,6 +4,9 @@
   "description": "MEW Web socket Signaling server",
   "main": "server.js",
   "scripts": {
+    "devServer": "nodemon ./test/simpleExpressTestServer/www.js",
+    "devServer:plain": "node ./test/simpleExpressTestServer/www.js",
+    "start:dev": "node server.js",
     "start": "nodemon server.js",
     "inspect": "nodemon --inspect server.js",
     "debug": "DEBUG=* nodemon --inspect server.js",

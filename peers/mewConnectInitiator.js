@@ -5,15 +5,10 @@
 * match the two sides of the connection
 */
 
-class MewConnectInitiator extends MewConnectCommon{
+class MewConnectInitiator extends MewConnectSimplePeer{
 
-    constructor(uiCommunicatorFunc, loggingFunc) {
-        super(uiCommunicatorFunc, loggingFunc);
-        // this.uiCommunicatorFunc = uiCommunicatorFunc || function (arg1, arg2) {
-        // };
-        // this.logger = loggingFunc || function (arg1, arg2) {
-        // };
-        // this.middleware = [];
+    constructor(uiCommunicatorFunc, loggingFunc, peerLib) {
+        super(uiCommunicatorFunc, loggingFunc, peerLib);
 
         this.mewCrypto = new MewConnectCrypto();
         console.log(this.mewCrypto);
@@ -53,7 +48,25 @@ class MewConnectInitiator extends MewConnectCommon{
         console.log("initiatorConnect", socket);
         this.uiCommunicator("SocketConnectedEvent");
 
-        socket.on("confirmation", this.sendOffer.bind(this)); // response
+        this.socketOn("confirmation", this.sendOffer.bind(this)); // response
+        this.socketOn("answer", this.recieveAnswer.bind(this));
+        this.socketOn("confirmationFailedBusy", () => {
+            this.uiCommunicator("confirmationFailedEvent");
+            this.logger("confirmation Failed: Busy");
+        });
+        this.socketOn("confirmationFailed", () => {
+            this.uiCommunicator("confirmationFailedEvent");
+            this.logger("confirmation Failed: invalid confirmation");
+        });
+        this.socketOn("InvalidConnection", () => {
+            this.uiCommunicator("confirmationFailedEvent"); // should be different error message
+            this.logger("confirmation Failed: no opposite peer found");
+        });
+        this.socketOn('disconnect', (reason) => {
+            this.logger(reason);
+        });
+
+/*        socket.on("confirmation", this.sendOffer.bind(this)); // response
         socket.on("answer", this.recieveAnswer.bind(this));
         socket.on("confirmationFailedBusy", () => {
             this.uiCommunicator("confirmationFailedEvent");
@@ -69,7 +82,7 @@ class MewConnectInitiator extends MewConnectCommon{
         });
         socket.on('disconnect', (reason) => {
             this.logger(reason);
-        });
+        });*/
         return socket;
     }
 
@@ -84,27 +97,9 @@ class MewConnectInitiator extends MewConnectCommon{
 
     sendOffer(data) {
         this.logger("sendOffer", data);
-        this.p = this.initiatorStartRTC(this.socket);
+        this.initiatorStartRTC(this.socket);
     }
 
-    /*
-  * begins the rtc connection and creates the offer and rtc confirm code
-  * */
-    initiatorStartRTC(socket, signalListener) {
-        if (!signalListener) {
-            signalListener = this.initiatorSignalListener(socket);
-        }
-
-        this.uiCommunicator("RtcInitiatedEvent");
-        let p = new SimplePeer({initiator: true, trickle: false});
-        this.p = p;
-        p.on('error', this.onError.bind(this));
-        p.on('connect', this.onConnect.bind(this));
-        p.on('close', this.onClose.bind(this));
-        p.on('data', this.onData.bind(this));
-        p.on('signal', signalListener.bind(this));
-        return p;
-    }
 
     onError(err) {
         this.logger("error", err);
@@ -112,10 +107,14 @@ class MewConnectInitiator extends MewConnectCommon{
 
     onConnect() {
         this.logger("CONNECT", "ok");
-        this.p.send('From Mobile');
+        // this.p.send('From Mobile');
+        this.rtcSend({type: "text", data: "From Mobile"});
         this.uiCommunicator("RtcConnectedEvent");
-        this.socket.emit("rtcConnected", this.socketKey);
-        this.socket.disconnect();
+        this.socketEmit("rtcConnected", this.socketKey);
+        this.socketDisconnect();
+
+        // this.socket.emit("rtcConnected", this.socketKey);
+        // this.socket.disconnect();
     }
 
     onClose(data) {
@@ -125,8 +124,13 @@ class MewConnectInitiator extends MewConnectCommon{
     onData(data) {
         console.log("DATA RECEIVED", data.toString());
         try {
-            let jData = JSON.parse(data);
-            this.applyDatahandlers(jData);
+            if(typeof data === "string"){
+                let jData = JSON.parse(data);
+                console.log("data as JSON:", jData);
+                this.applyDatahandlers(jData);
+            } else {
+                this.applyDatahandlers(data);
+            }
         } catch (e) {
             console.error(e);
             this.logger("peer2 data", data.toString());
@@ -141,7 +145,8 @@ class MewConnectInitiator extends MewConnectCommon{
         return function offerEmmiter(data) {
             this.logger('SIGNAL', JSON.stringify(data));
             let send = JSON.stringify(data);
-            socket.emit('offerSignal', {data: send, connId: this.connId});
+            this.socketEmit('offerSignal', {data: send, connId: this.connId});
+            // socket.emit('offerSignal', {data: send, connId: this.connId});
         }
     }
 
@@ -149,7 +154,8 @@ class MewConnectInitiator extends MewConnectCommon{
     // sends a hardcoded message through the rtc connection
     testRTC(msg) {
         return function () {
-            this.p.send(JSON.stringify({type: 2, text: msg}));
+            this.rtcSend(JSON.stringify({type: 2, text: msg}));
+            // this.p.send(JSON.stringify({type: 2, text: msg}));
         }.bind(this);
     }
 
@@ -159,7 +165,8 @@ class MewConnectInitiator extends MewConnectCommon{
         return function () {
             //   console.log(stuff);
             console.log(msg);
-            this.p.send(JSON.stringify({type: type, data: msg}));
+            this.rtcSend(JSON.stringify({type: type, text: msg}));
+            // this.p.send(JSON.stringify({type: type, data: msg}));
         }.bind(this);
     }
 
@@ -169,7 +176,8 @@ class MewConnectInitiator extends MewConnectCommon{
     disconnectRTC() {
         return function () {
             this.uiCommunicator("RtcDisconnectEvent");
-            this.p.destroy();
+            this.rtcDestroy();
+            // this.p.destroy();
         }.bind(this);
     }
 
@@ -178,46 +186,22 @@ class MewConnectInitiator extends MewConnectCommon{
     * Used by the initiator to accept the rtc offer's answer
     */
     recieveAnswer(data) {
-        this.p.signal(JSON.parse(data.data));
+        this.rtcRecieveAnswer(data);
+        // this.p.signal(JSON.parse(data.data));
     }
-    //
-    // use(func) {
-    //     this.middleware.push(func);
-    // }
-    //
-    // useDataHandlers(input, fn) {
-    //     var fns = this.middleware.slice(0);
-    //     if (!fns.length) return fn(null);
-    //
-    //     function run(i) {
-    //         fns[i](input, function (err) {
-    //             // upon error, short-circuit
-    //             if (err) return fn(err);
-    //
-    //             // if no middleware left, summon callback
-    //             if (!fns[i + 1]) return fn(null);
-    //
-    //             // go on to next
-    //             run(i + 1);
-    //         });
-    //     }
-    //
-    //     run(0);
-    // }
-    //
-    // applyDatahandlers(data) {
-    //     let next = function (args) {
-    //         return args;
-    //     }; // function that runs after all middleware
-    //     this.useDataHandlers(data, next);
-    // }
-    //
-    // /*
-    // * allows external function to listen for lifecycle events
-    // */
-    // uiCommunicator(event, data) {
-    //     return data ? this.uiCommunicatorFunc(event, data) : this.uiCommunicatorFunc(event);
-    // }
+
+    socketEmit(signal, data){
+        this.socket.emit(signal, data);
+    }
+
+    socketDisconnect(){
+        this.socket.disconnect();
+    }
+
+    socketOn(signal, func){
+        this.socket.on(signal, func);
+    }
+
 
 }
 
