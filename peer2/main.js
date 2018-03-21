@@ -98,8 +98,10 @@ socketKeyBtn
       let connParts = qrString.split("-");
       console.log('connParts', connParts); // todo remove debug item
       let options = {
-          connId: connParts[1].trim(),
-          key: connParts[0].trim()
+            // connId: connParts[1].trim(), //todo uncomment after dev
+            // key: connParts[0].trim() //todo uncomment after dev
+            connId: '321', //todo remove dev item
+            key: '828' //todo remove dev item
       };
       mewConnect.receiverCall(`https://${urlBase}:3001`, options);
       // mewConnect.receiverCall("ws://localhost:3001", document.getElementById("connId").value);
