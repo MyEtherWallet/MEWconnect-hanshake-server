@@ -5,21 +5,23 @@ handshake server for MEW signer
 
 Clone Repo:
 
-git clone https://github.com/MyEtherWallet/mew-signer-hs.git
+`git clone https://github.com/MyEtherWallet/mew-signer-hs.git`
 
 Install Dependencies:
 
-npm install
+`npm install`
 
 Start Signal Server:
 
-node server.js
+`node server.js`
 
 or 
 
-npm start
+`npm start`
+
 
 ## MEW Connect* API
+-----
 *Working Name
 
 ### Signaling:
