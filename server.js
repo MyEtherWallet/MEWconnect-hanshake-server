@@ -90,7 +90,13 @@ function ioConnection(socket) {
             socket.to(data.connId).emit("attemptingTurn", {data: null}); // emit #4 answer (listener: initiator peer)
             let connItem = locateMatchingConnection(data.connId);
             connItem.updateTurnStatus();
-            createTurnConnection();
+            createTurnConnection().then((token) => {
+                socket.to(data.connId).emit("turnToken", {data: token.iceServers}); // emit #5 turnToken (listener: both peer)
+                console.log("--------------------");
+                console.log(token.username);
+                console.log(token);
+                console.log("--------------------");
+            });
         });
 
     } catch (e) {
@@ -107,14 +113,8 @@ function createTurnConnection(){
     console.log(accountSid, authToken);
     const client = require('twilio')(accountSid, authToken);
 
-    client.tokens
-        .create()
-        .then((token) => {
-            console.log("--------------------");
-            console.log(token.username);
-            console.log(token);
-            console.log("--------------------");
-        });
+    return client.tokens
+        .create();
 }
 
 
