@@ -19,14 +19,11 @@ or
 
 npm start
 
-## Usage
-
-#### Key Components:
-MEW Connect* API
+## MEW Connect* API
 *Working Name
 
-Signaling:
-####Key Components:
+### Signaling:
+#### Key Components:
 
 **Initiator :** Mew Website or Other End Point
 
@@ -38,7 +35,7 @@ Signaling:
 
 
 
-####Initial Signaling Event Progression Overview:
+#### Initial Signaling Event Progression Overview:
 
 **Connect** [Server → Initiator] (initial socket connection with signaling server)
 
@@ -50,25 +47,25 @@ Signaling:
 
 **Confirmation** [Server → Initiator] (Confirmation of Receiver identity made by the server and initialization of RTC my be attempted)
 
-(WebRTC Offer Creation by Initiator)
+*(WebRTC Offer Creation by Initiator)*
 
 **OfferSignal** [Initiator → Server] (Transmission of an offer and server list to the signaling server for retransmission to the Receiver)
 
 **Offer** [Server → Receiver] (Retransmission of the offer and server list to the Receiver)
 
-(WebRTC Answer Creation by Initiator)
+*(WebRTC Answer Creation by Initiator)*
 
 **AnswerSignal** [Receiver → Server] (Transmission of an answer to the received offer for retransmission to the Initiator)
 
 **Answer** [Server → Initiator] (Retransmission of the answer to the Initiator)
 
-(On Successful Connection)
+*(On Successful Connection)*
 
 **RtcConnected** [Receiver → Server] (signal to clean up the connection entry)
 
 **RtcConnected** [Initiator → Server] (signal to clean up the connection entry)
 
-(Upon receipt of rtcConnected the server removes the related connection entry)
+*(Upon receipt of rtcConnected the server removes the related connection entry)*
 
 
 
@@ -78,23 +75,23 @@ Signaling:
 
 **TryTurn** [Receiver → Server] (Signal RTC Connection Failure to the signaling server. Sets a flag (if unset) in the connection entry indicating a RTC Connection via a TURN Server is to be attempted)
 
-(Obtain TURN Server credentials)
+*(Obtain TURN Server credentials)*
 
 **TurnToken** [Server → Initiator] (Transmission of TURN Server credentials triggering Initiator to re-attempt RTC connection)
 
-(WebRTC Offer Creation by Initiator)
+*(WebRTC Offer Creation by Initiator)*
 
 **OfferSignal** [Initiator → Server] (Transmission of an offer and TURN server list with credentials to the signaling server for retransmission to the Receiver)
 
 **Offer** [Server → Receiver] (Retransmission of the offer and TURN server list with credentials to the Receiver)
 
-(WebRTC Answer Creation by Initiator)
+*(WebRTC Answer Creation by Initiator)*
 
 **AnswerSignal** [Receiver → Server] (Transmission of an answer to the received offer for retransmission to the Initiator)
 
 **Answer** [Server → Initiator] (Retransmission of the answer to the Initiator)
 
-
+------
 
 ### Signaling Event Details:
 
