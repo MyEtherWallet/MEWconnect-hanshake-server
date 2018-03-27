@@ -2,59 +2,44 @@
 //todo look into refactoring to accept plug-in testing data, and/or testing tools
 
 const fs = require('fs');
-const path = require("path");
-let options;
-if(process.env.LOGNAME === "ubuntu"){
-    options = {
-        key: fs.readFileSync("/home/ubuntu/mew-signer-hs/test/simpleExpressTestServer/devCert.key"),
-        cert: fs.readFileSync("/home/ubuntu/mew-signer-hs/test/simpleExpressTestServer/devCert.cert"),
-        requestCert: false,
-        rejectUnauthorized: false
-    };
-} else {
-    options = {
-        key: fs.readFileSync(path.join("test/simpleExpressTestServer/devCert.key")),
-        cert: fs.readFileSync(path.join("test/simpleExpressTestServer/devCert.cert")),
-        requestCert: false,
-        rejectUnauthorized: false
-    };
-}
+const signal = require("./signals").signals;
+const stages = require("./signals").stages;
+require('dotenv').config();
+
+let options = {
+    key: fs.readFileSync("./certs/devCert.key"),
+    cert: fs.readFileSync("./certs/devCert.cert"),
+    requestCert: false,
+    rejectUnauthorized: false
+};
+
 
 const server = require('https').createServer(options);
-// const server = require("http").createServer();
 const io = require("socket.io")(server, {
     serveClient: false,
     secure: true
 });
 
 const port = process.env.PORT || 3001;
-let mewCrypto = require("./serverMewCrypto");
 let ServerConnection = require("./serverConnection");
 
-// let checkNumber, offerMsg, pubKey;
-
 let clients = new Map();
-let connected = [];
 
 server.listen(port, () => {
     logger("Listening on " + port);
 });
 
 
-// io.use((socket, next) => {
-//   logger("-------------------- exchange Listener --------------------");
-//   logger(socket.handshake);
-//   logger("------------------------------------------------------------");
-//   next();
-// });
 
+io.use(listenToConn);
 io.use((socket, next) => {
+
     //todo check for collisions, inform, and update client
     next();
 });
 
 
-io.on("connection", ioConnection);
+io.on(signal.connection, ioConnection);
 
 
 function ioConnection(socket) {
@@ -62,32 +47,32 @@ function ioConnection(socket) {
         let token = socket.handshake.query;
         let connector = token.stage || false;
         switch (connector) {
-            case "initiator":
+            case stages.initiator:
                 initiatorIncomming(socket, token);
                 break;
-            case "receiver":
+            case stages.receiver:
                 receiverIncomming(socket, token);
                 break;
             default:
-                console.log("WTF");
+                console.error("Invalid Stage");
                 break;
         }
 
-        socket.on("signature", data => {
+        socket.on(signal.signature, data => {
             receiverConfirm(socket, data);
         });
 
-        socket.on("offerSignal", data => {
+        socket.on(signal.offerSignal, data => {
             logger("OFFER", data);
-            io.to(data.connId).emit("offer", {data: data.data}); // emit #3 offer (listener: receiver peer)
+            io.to(data.connId).emit(signal.offer, {data: data.data}); // emit #3 offer (listener: receiver peer)
         });
 
-        socket.on("answerSignal", data => {
+        socket.on(signal.answerSignal, data => {
             logger("answer", data);
-            io.to(data.connId).emit("answer", {data: data.data}); // emit #4 answer (listener: initiator peer)
+            io.to(data.connId).emit(signal.answer, {data: data.data}); // emit #4 answer (listener: initiator peer)
         });
 
-        socket.on("rtcConnected", data => {
+        socket.on(signal.rtcConnected, data => {
             let cleanUpOk = clients.delete(data);
             if (!cleanUpOk) {
                 logger("connection details already clean or error cleaning up closed connection details");
@@ -96,19 +81,47 @@ function ioConnection(socket) {
             }
         });
 
-        socket.on("disconnect", reason => {
+        socket.on(signal.disconnect, reason => {
             console.log("disconnect reason", reason);
             socket.disconnect(true);
-        })
+        });
+
+        socket.on("tryTurn", data => {
+            socket.to(data.connId).emit("attemptingTurn", {data: null}); // emit #4 answer (listener: initiator peer)
+            let connItem = locateMatchingConnection(data.connId);
+            connItem.updateTurnStatus();
+            createTurnConnection();
+        });
+
     } catch (e) {
         console.error(e);
     }
 }
 
+
+function createTurnConnection(){
+    console.log("CREATE TURN CONNECTION");
+
+    const accountSid = process.env.TWILIO;
+    const authToken = process.env.TWILLO_TOKEN;
+    console.log(accountSid, authToken);
+    const client = require('twilio')(accountSid, authToken);
+
+    client.tokens
+        .create()
+        .then((token) => {
+            console.log("--------------------");
+            console.log(token.username);
+            console.log(token);
+            console.log("--------------------");
+        });
+}
+
+
+
 function initiatorIncomming(socket, details) {
     try {
         console.error("CREATING CONNECTION");
-        console.log("CREATING DETAILS: ", details);
         createConnectionEntry(details, socket.id);
         socket.join(details.connId);
     } catch (e) {
@@ -121,11 +134,11 @@ function receiverIncomming(socket, details) {
         console.error("RECEIVER CONNECTION");
         let connInstance = locateMatchingConnection(details.connId);
         if (connInstance) {
-            socket.emit("handshake", {toSign: connInstance.message}) // emit #1 handshake  (listener: receiver peer)
+            socket.emit(signal.handshake, {toSign: connInstance.message}) // emit #1 handshake  (listener: receiver peer)
         } else {
             logger(clients);
             console.error("NO CONNECTION DETAILS");
-            socket.emit("InvalidConnection"); // emit InvalidConnection
+            socket.emit(signal.invalidConnection); // emit InvalidConnection
         }
     } catch (e) {
         console.error(e);
@@ -135,7 +148,6 @@ function receiverIncomming(socket, details) {
 function receiverConfirm(socket, details) {
     try {
         console.error("RECEIVER CONFIRM");
-        console.log("RECEIVER CONFIRM DETAILS: ", details);
         let connInstance = locateMatchingConnection(details.connId);
         logger(details.connId);
         if (connInstance) {
@@ -144,18 +156,18 @@ function receiverConfirm(socket, details) {
                 logger("PAIR CONNECTION VERIFIED");
                 let canUpdate = connInstance.updateConnectionEntry(socket.id);
                 if (canUpdate) {
-                    socket.to(details.connId).emit("confirmation", {connId: connInstance.connId}) // emit #2  confirmation (listener: initiator peer)
+                    socket.to(details.connId).emit(signal.confirmation, {connId: connInstance.connId}) // emit #2  confirmation (listener: initiator peer)
                 } else {
-                    socket.to(details.connId).emit("confirmationFailedBusy"); // emit confirmationFailedBusy
+                    socket.to(details.connId).emit(signal.confirmationFailedBusy); // emit confirmationFailedBusy
                 }
             } else {
                 console.error("CONNECTION VERIFY FAILED");
-                socket.emit("confirmationFailed"); // emit confirmationFailed
+                socket.emit(signal.confirmationFailed); // emit confirmationFailed
             }
         } else {
             logger(clients);
             console.error("NO CONNECTION DETAILS");
-            socket.emit("InvalidConnection"); // emit InvalidConnection
+            socket.emit(signal.invalidConnection); // emit InvalidConnection
         }
     } catch (e) {
 
@@ -166,7 +178,6 @@ function receiverConfirm(socket, details) {
 
 function createConnectionEntry(details, socketId) {
     try {
-        console.log(details);
         details.initiator = socketId;
         let connectionInstance = new ServerConnection(details);
         clients.set(details.connId, connectionInstance);
@@ -181,6 +192,7 @@ function locateMatchingConnection(connId) {
     try {
         logger(clients);
         if (clients.has(connId)) {
+            console.log("CONNECTION FOUND");
             return clients.get(connId);
         } else {
             console.error("NO MATCHING CONNECTION");
@@ -207,5 +219,12 @@ function logger(tag, content) {
     } else {
         console.log(tag, content)
     }
+}
+
+function listenToConn(socket, next){
+  logger("-------------------- exchange Listener --------------------");
+  logger(socket.handshake);
+  logger("------------------------------------------------------------");
+  next();
 }
 

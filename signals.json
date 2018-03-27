@@ -1,0 +1,24 @@
+{
+  "signals":{
+    "attemptingTurn":"attemptingTurn",
+    "turnToken":"turnToken",
+    "connection": "connection",
+    "signature":"signature",
+    "offerSignal":"offerSignal",
+    "offer":"offer",
+    "answerSignal":"answerSignal",
+    "answer":"answer",
+    "rtcConnected":"rtcConnected",
+    "disconnect":"disconnect",
+    "handshake":"handshake",
+    "confirmation":"confirmation",
+    "invalidConnection":"InvalidConnection",
+    "confirmationFailedBusy":"confirmationFailedBusy",
+    "confirmationFailed":"confirmationFailed"
+  },
+  "stages": {
+    "initiator":"initiator",
+    "receiver":"receiver"
+  }
+
+}

@@ -4,13 +4,18 @@
   "description": "MEW Web socket Signaling server",
   "main": "server.js",
   "scripts": {
-    "start:dev": "node server.js",
-    "start": "nodemon server.js",
+    "android": "nodemon server.js android",
+    "android:debug": "DEBUG=* nodemon server.js android",
+    "android:inspect": "nodemon --inspect server.js android",
+    "android:debuginspect": "DEBUG=* nodemon --inspect server.js android",
+    "start:dev": "nodemon server.js",
+    "start": "node server.js",
     "inspect": "nodemon --inspect server.js",
     "debug": "DEBUG=* nodemon --inspect server.js",
     "docs": "jsdoc -c ./jsdoc.json"
   },
   "dependencies": {
+    "dotenv": "^5.0.1",
     "eccrypto": "^1.0.3",
     "express": "^4.16.2",
     "http": "0.0.0",
@@ -19,6 +24,7 @@
     "secp256k1": "^3.5.0",
     "simple-peer": "^9.0.0",
     "socket.io": "^2.0.4",
+    "socket.io-client": "^2.0.4",
     "web3": "^1.0.0-beta.30",
     "webpack": "^4.1.1",
     "webpack-merge": "^4.1.2"

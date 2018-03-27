@@ -7,6 +7,8 @@ class ServerConnection {
         this.pub = details.pub;
         this.initiator = details.initiator;
         this.receiver = details.receiver || undefined;
+        this.requireTurn = false;
+        this.tryTurnSignalCount = 0;
     }
 
 
@@ -26,6 +28,19 @@ class ServerConnection {
             console.error(e);
             return false;
         }
+    }
+
+    updateTurnStatus(){
+        this.tryTurnSignalCount = this.tryTurnSignalCount + 1;
+        this.requireTurn = true;
+    }
+
+    attemptTurn(){
+        return !this.requireTurn;
+    }
+
+    connectionFailure(){
+        return this.tryTurnSignalCount <= 2;
     }
 
     verifySig(receiver) {

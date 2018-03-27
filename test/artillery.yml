@@ -1,33 +1,60 @@
 # Just the example (didn't get the couple prelim tries I made to work [so I just put the example back in here])
-  config:
-    target: "ws://localhost:3001"
-    phases:
-      - duration: 20
-        arrivalRate: 10
-    ws:
-      # Ignore SSL certificate errors
-      # - useful in *development* with self-signed certs
-      rejectUnauthorized: false
- scenarios:
-   - engine: "socketio"
-     flow:
-       - emit:
-           channel: "echo"
-           data: "hello"
-           response:
-             channel: "echoed"
-             data: "hello"
-       - emit:
-           channel: "echo"
-           data: "world"
-           response:
-             channel: "echoed"
-             data: "world"
-       - think: 1
-       - emit:
-           channel: "echo"
-           data: "do not care about the response"
-       - emit:
-           channel: "echo"
-           data: "still do not care about the response"
-       - think: 1
+
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 10
+      arrivalRate: 1
+    - duration: 10
+      arrivalRate: 5
+  variables:
+    greeting: ["hello", "goedemorgen", "добрый день", "guten tag", "bonjour", "hola"]
+  processor: "./functions.js"
+
+scenarios:
+  - name: "A user that just lurks"
+    weight: 75
+    engine: "socketio"
+    flow:
+      - get:
+          url: "/"
+      - emit:
+          channel: "add user"
+          data: "lurker-{{$randomString()}}"
+      - think: 60
+
+  - name: "A mostly quiet user"
+    weight: 15
+    engine: "socketio"
+    flow:
+      - get:
+          url: "/"
+      - emit:
+          channel: "add user"
+          data: "quiet-{{ $randomString() }}"
+      - think: 5
+      - emit:
+          channel: "new message"
+          data: "{{ greeting }}"
+      - think: 60
+
+  - name: "A chatty user"
+    weight: 10
+    engine: "socketio"
+    flow:
+      - get:
+          url: "/"
+      - emit:
+          channel: "add user"
+          data: "chatty-{{ $randomString() }}"
+      - emit:
+          channel: "new message"
+          data: "{{ greeting }}"
+      - loop:
+          - function: "setMessage"
+          - emit:
+              channel: "new message"
+              data: "{{ connId }}"
+          - think: 10
+        count: 10
+      - think: 60
