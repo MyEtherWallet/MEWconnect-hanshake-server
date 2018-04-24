@@ -1,10 +1,12 @@
 "use strict";
-//todo look into refactoring to accept plug-in testing data, and/or testing tools
 
+//todo look into refactoring to accept plug-in testing data, and/or testing tools
+require('dotenv').config();
 const fs = require('fs');
 const signal = require("./signals").signals;
 const stages = require("./signals").stages;
-require('dotenv').config();
+const logger = require("./logger");
+const logToConsole = true;
 
 let options = {
     key: fs.readFileSync("./certs/devCert.key"),
@@ -20,13 +22,16 @@ const io = require("socket.io")(server, {
     secure: true
 });
 
+
+console.log(consoleLogger);
+
 const port = process.env.PORT || 3001;
 let ServerConnection = require("./serverConnection");
 
 let clients = new Map();
 
 server.listen(port, () => {
-    logger("Listening on " + port);
+    consoleLogger("Listening on " + port);
 });
 
 
@@ -63,26 +68,26 @@ function ioConnection(socket) {
         });
 
         socket.on(signal.offerSignal, data => {
-            logger("OFFER", data);
+            consoleLogger("OFFER", data);
             io.to(data.connId).emit(signal.offer, {data: data.data}); // emit #3 offer (listener: receiver peer)
         });
 
         socket.on(signal.answerSignal, data => {
-            logger("answer", data);
+            consoleLogger("answer", data);
             io.to(data.connId).emit(signal.answer, {data: data.data}); // emit #4 answer (listener: initiator peer)
         });
 
         socket.on(signal.rtcConnected, data => {
             let cleanUpOk = clients.delete(data);
             if (!cleanUpOk) {
-                logger("connection details already clean or error cleaning up closed connection details");
+                consoleLogger("connection details already clean or error cleaning up closed connection details");
             } else { // not really necessary if clean up was ok
-                logger("connection details removed");
+                consoleLogger("connection details removed");
             }
         });
 
         socket.on(signal.disconnect, reason => {
-            console.log("disconnect reason", reason);
+            consoleLogger("disconnect reason", reason); //todo remove dev item
             socket.disconnect(true);
         });
 
@@ -92,25 +97,25 @@ function ioConnection(socket) {
             connItem.updateTurnStatus();
             createTurnConnection().then((token) => {
                 socket.to(data.connId).emit("turnToken", {data: token.iceServers}); // emit #5 turnToken (listener: both peer)
-                console.log("--------------------");
-                console.log(token.username);
-                console.log(token);
-                console.log("--------------------");
+                consoleLogger("--------------------"); //todo remove dev item
+                consoleLogger("token.username: ", token.username); //todo remove dev item
+                consoleLogger("token", token); //todo remove dev item
+                consoleLogger("--------------------"); //todo remove dev item
             });
         });
 
     } catch (e) {
-        console.error(e);
+        logger.error(e);
     }
 }
 
 
 function createTurnConnection(){
-    console.log("CREATE TURN CONNECTION");
+    consoleLogger("CREATE TURN CONNECTION");
 
     const accountSid = process.env.TWILIO;
     const authToken = process.env.TWILLO_TOKEN;
-    console.log(accountSid, authToken);
+    logger.verbose(accountSid, authToken);
     const client = require('twilio')(accountSid, authToken);
 
     return client.tokens
@@ -121,39 +126,39 @@ function createTurnConnection(){
 
 function initiatorIncomming(socket, details) {
     try {
-        console.error("CREATING CONNECTION");
+        consoleLogger("CREATING CONNECTION");
         createConnectionEntry(details, socket.id);
         socket.join(details.connId);
     } catch (e) {
-        console.error(e);
+        logger.error(e);
     }
 }
 
 function receiverIncomming(socket, details) {
     try {
-        console.error("RECEIVER CONNECTION");
+        consoleLogger("RECEIVER CONNECTION");
         let connInstance = locateMatchingConnection(details.connId);
         if (connInstance) {
             socket.emit(signal.handshake, {toSign: connInstance.message}) // emit #1 handshake  (listener: receiver peer)
         } else {
-            logger(clients);
-            console.error("NO CONNECTION DETAILS");
+            consoleLogger("current client map: ", clients);
+            consoleLogger("NO CONNECTION DETAILS");
             socket.emit(signal.invalidConnection); // emit InvalidConnection
         }
     } catch (e) {
-        console.error(e);
+        logger.error(e);
     }
 }
 
 function receiverConfirm(socket, details) {
     try {
-        console.error("RECEIVER CONFIRM");
+        consoleLogger("RECEIVER CONFIRM");
         let connInstance = locateMatchingConnection(details.connId);
-        logger(details.connId);
+        consoleLogger("connId", details.connId);
         if (connInstance) {
             if (connInstance.verifySig(details.signed)) {
                 socket.join(details.connId);
-                logger("PAIR CONNECTION VERIFIED");
+                consoleLogger("PAIR CONNECTION VERIFIED");
                 let canUpdate = connInstance.updateConnectionEntry(socket.id);
                 if (canUpdate) {
                     socket.to(details.connId).emit(signal.confirmation, {connId: connInstance.connId}) // emit #2  confirmation (listener: initiator peer)
@@ -161,16 +166,16 @@ function receiverConfirm(socket, details) {
                     socket.to(details.connId).emit(signal.confirmationFailedBusy); // emit confirmationFailedBusy
                 }
             } else {
-                console.error("CONNECTION VERIFY FAILED");
+                consoleLogger("CONNECTION VERIFY FAILED");
                 socket.emit(signal.confirmationFailed); // emit confirmationFailed
             }
         } else {
-            logger(clients);
-            console.error("NO CONNECTION DETAILS");
+            consoleLogger("current client map: ",clients);
+            consoleLogger("NO CONNECTION DETAILS");
             socket.emit(signal.invalidConnection); // emit InvalidConnection
         }
     } catch (e) {
-
+        logger.error(e);
     }
 
 }
@@ -181,25 +186,25 @@ function createConnectionEntry(details, socketId) {
         details.initiator = socketId;
         let connectionInstance = new ServerConnection(details);
         clients.set(details.connId, connectionInstance);
-        logger(clients);
+        consoleLogger("current client map: ",clients);
     } catch (e) {
-        console.error(e);
+        logger.error(e);
     }
 }
 
 
 function locateMatchingConnection(connId) {
     try {
-        logger(clients);
+        consoleLogger("current client map: ",clients);
         if (clients.has(connId)) {
-            console.log("CONNECTION FOUND");
+            consoleLogger("CONNECTION FOUND");
             return clients.get(connId);
         } else {
-            console.error("NO MATCHING CONNECTION");
+            consoleLogger("NO MATCHING CONNECTION");
             return false;
         }
     } catch (e) {
-        console.error(e);
+        logger.error(e);
     }
 }
 
@@ -213,18 +218,28 @@ function keyToConnId(key) {
     return key.slice(32)
 }
 
-function logger(tag, content) {
-    if (!content) {
-        console.log(tag);
+function consoleLogger(tag, content) {
+    if(logToConsole){
+        if (!content) {
+            console.log(tag);
+        } else {
+            console.log(tag, content)
+        }
     } else {
-        console.log(tag, content)
+        if (!content) {
+            logger.verbose("TAG: " + tag);
+        } else {
+            logger.verbose("TAG: " + tag);
+            logger.verbose(content);
+        }
     }
+
 }
 
 function listenToConn(socket, next){
-  logger("-------------------- exchange Listener --------------------");
-  logger(socket.handshake);
-  logger("------------------------------------------------------------");
+  consoleLogger("-------------------- exchange Listener --------------------");
+  consoleLogger(socket.handshake);
+  consoleLogger("------------------------------------------------------------");
   next();
 }
 
