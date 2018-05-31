@@ -5,8 +5,10 @@ require('dotenv').config();
 const fs = require('fs');
 const signal = require("./signals").signals;
 const stages = require("./signals").stages;
-const logger = require("./logger");
-const logToConsole = true;
+const logger = require("./logger").serverErrors;
+const wrtcLogger = require("./logger").wrtcLogger;
+const logToConsole = false;
+
 
 let options = {
     key: fs.readFileSync("./certs/devCert.key"),
@@ -22,9 +24,6 @@ const io = require("socket.io")(server, {
     secure: true
 });
 
-
-console.log(consoleLogger);
-
 const port = process.env.PORT || 3001;
 let ServerConnection = require("./serverConnection");
 
@@ -33,7 +32,6 @@ let clients = new Map();
 server.listen(port, () => {
     consoleLogger("Listening on " + port);
 });
-
 
 
 io.use(listenToConn);
@@ -94,14 +92,23 @@ function ioConnection(socket) {
         socket.on("tryTurn", data => {
             socket.to(data.connId).emit("attemptingTurn", {data: null}); // emit #4 answer (listener: initiator peer)
             let connItem = locateMatchingConnection(data.connId);
-            connItem.updateTurnStatus();
-            createTurnConnection().then((token) => {
-                socket.to(data.connId).emit("turnToken", {data: token.iceServers}); // emit #5 turnToken (listener: both peer)
-                consoleLogger("--------------------"); //todo remove dev item
-                consoleLogger("token.username: ", token.username); //todo remove dev item
-                consoleLogger("token", token); //todo remove dev item
-                consoleLogger("--------------------"); //todo remove dev item
-            });
+            if (connItem) {
+                connItem.updateTurnStatus();
+                createTurnConnection()
+                    .then((_results) => {
+                        socket.to(data.connId).emit("turnToken", {data: _results.iceServers}); // emit #5 turnToken (listener: both peer)
+                        wrtcLogger.info(`ice servers returned. token.iceServers: ${_results.iceServers}`);
+                        consoleLogger("--------------------"); //todo remove dev item
+                        consoleLogger("token.username: ", _results.username); //todo remove dev item
+                        consoleLogger("token", _results); //todo remove dev item
+                        consoleLogger("--------------------"); //todo remove dev item
+                    });
+            } else {
+                wrtcLogger.warn(" FAILED TO LOCATE MATCHING CONNECTION FOR TURN CONNECTION ATTEMPT");
+                wrtcLogger.warn(` connectiono ID. data.connId: ${data.connId}`)
+
+            }
+
         });
 
     } catch (e) {
@@ -110,7 +117,7 @@ function ioConnection(socket) {
 }
 
 
-function createTurnConnection(){
+function createTurnConnection() {
     consoleLogger("CREATE TURN CONNECTION");
 
     const accountSid = process.env.TWILIO;
@@ -121,7 +128,6 @@ function createTurnConnection(){
     return client.tokens
         .create();
 }
-
 
 
 function initiatorIncomming(socket, details) {
@@ -170,7 +176,7 @@ function receiverConfirm(socket, details) {
                 socket.emit(signal.confirmationFailed); // emit confirmationFailed
             }
         } else {
-            consoleLogger("current client map: ",clients);
+            consoleLogger("current client map: ", clients);
             consoleLogger("NO CONNECTION DETAILS");
             socket.emit(signal.invalidConnection); // emit InvalidConnection
         }
@@ -186,7 +192,7 @@ function createConnectionEntry(details, socketId) {
         details.initiator = socketId;
         let connectionInstance = new ServerConnection(details);
         clients.set(details.connId, connectionInstance);
-        consoleLogger("current client map: ",clients);
+        consoleLogger("current client map: ", clients);
     } catch (e) {
         logger.error(e);
     }
@@ -195,7 +201,7 @@ function createConnectionEntry(details, socketId) {
 
 function locateMatchingConnection(connId) {
     try {
-        consoleLogger("current client map: ",clients);
+        consoleLogger("current client map: ", clients);
         if (clients.has(connId)) {
             consoleLogger("CONNECTION FOUND");
             return clients.get(connId);
@@ -219,7 +225,7 @@ function keyToConnId(key) {
 }
 
 function consoleLogger(tag, content) {
-    if(logToConsole){
+    if (logToConsole) {
         if (!content) {
             console.log(tag);
         } else {
@@ -236,10 +242,10 @@ function consoleLogger(tag, content) {
 
 }
 
-function listenToConn(socket, next){
-  consoleLogger("-------------------- exchange Listener --------------------");
-  consoleLogger(socket.handshake);
-  consoleLogger("------------------------------------------------------------");
-  next();
+function listenToConn(socket, next) {
+    consoleLogger("-------------------- exchange Listener --------------------");
+    consoleLogger(socket.handshake);
+    consoleLogger("------------------------------------------------------------");
+    next();
 }
 
