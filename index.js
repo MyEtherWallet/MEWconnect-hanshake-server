@@ -11,8 +11,9 @@ let loggerMock = {
 function signalingServer(opts){
   "use strict";
 
-  let key = opts.key || null;
-  let cert = opts.cert || null;
+  if(!opts.key || !opts.cert) throw new Error("no SSL details provided to the signaling server");
+  let key = opts.key;
+  let cert = opts.cert ;
 
 //todo look into refactoring to accept plug-in testing data, and/or testing tools
   require('dotenv').config();
@@ -30,8 +31,8 @@ function signalingServer(opts){
   const port = process.env.PORT || 3001;
 
   let options = {
-    key: key || fs.readFileSync("./certs/devCert.key"),
-    cert: cert || fs.readFileSync("./certs/devCert.cert"),
+    key: key,
+    cert: cert ,
     requestCert: false,
     rejectUnauthorized: false
   };
