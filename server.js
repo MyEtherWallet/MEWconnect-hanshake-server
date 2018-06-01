@@ -1,5 +1,7 @@
 "use strict";
 
+
+
 //todo look into refactoring to accept plug-in testing data, and/or testing tools
 require('dotenv').config();
 const fs = require('fs');
@@ -8,40 +10,49 @@ const stages = require("./signals").stages;
 const logger = require("./logger");
 const logToConsole = true;
 
+const ServerConnection = require("./serverConnection");
 
-let options = {
+const clients = new Map();
+const port = process.env.PORT || 3001;
+
+
+
+function start(options){
+
+  options = options || {
     key: fs.readFileSync("./certs/devCert.key"),
     cert: fs.readFileSync("./certs/devCert.cert"),
     requestCert: false,
     rejectUnauthorized: false
-};
+  };
 
 
-const server = require('https').createServer(options);
-const io = require("socket.io")(server, {
+  let server = require('https').createServer(options);
+  let io = require("socket.io")(server, {
     serveClient: false,
     secure: true
-});
+  });
 
-const port = process.env.PORT || 3001;
-let ServerConnection = require("./serverConnection");
 
-let clients = new Map();
 
-server.listen(port, () => {
+
+  server.listen(port, () => {
     consoleLogger("Listening on " + port);
-});
+  });
 
 
-io.use(listenToConn);
-io.use((socket, next) => {
+  io.use(listenToConn);
+  io.use((socket, next) => {
 
     //todo check for collisions, inform, and update client
     next();
-});
+  });
 
+  io.on(signal.connection, ioConnection);
 
-io.on(signal.connection, ioConnection);
+  return {server: server, io: io}
+}
+
 
 
 function ioConnection(socket) {
@@ -248,3 +259,4 @@ function listenToConn(socket, next) {
     next();
 }
 
+module.exports = start;
