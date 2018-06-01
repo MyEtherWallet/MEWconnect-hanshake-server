@@ -1,5 +1,5 @@
 {
-  "name": "mewsigner",
+  "name": "mew-signer-hs",
   "version": "0.0.1",
   "description": "MEW Web socket Signaling server",
   "main": "server.js",
