@@ -4,6 +4,7 @@
 //todo look into refactoring to accept plug-in testing data, and/or testing tools
 require('dotenv').config();
 const fs = require('fs');
+
 const signal = require("./signals").signals;
 const stages = require("./signals").stages;
 const logger = require("./logger");
@@ -14,41 +15,33 @@ const ServerConnection = require("./serverConnection");
 const clients = new Map();
 const port = process.env.PORT || 3001;
 
-
-function start(options) {
-  if (!options) {
-    options = {
+    let options = {
       key: fs.readFileSync("./certs/devCert.key"),
       cert: fs.readFileSync("./certs/devCert.cert"),
       requestCert: false,
       rejectUnauthorized: false
     };
-  }
+
+const server = require('https').createServer(options);
+const io = require("socket.io")(server, {
+  serveClient: false,
+  secure: true
+});
 
 
-  let server = require('https').createServer(options);
-  let io = require("socket.io")(server, {
-    serveClient: false,
-    secure: true
-  });
+server.listen(port, () => {
+  consoleLogger("Listening on " + port);
+});
 
 
-  server.listen(port, () => {
-    consoleLogger("Listening on " + port);
-  });
+io.use(listenToConn);
+io.use((socket, next) => {
 
+  //todo check for collisions, inform, and update client
+  next();
+});
 
-  io.use(listenToConn);
-  io.use((socket, next) => {
-
-    //todo check for collisions, inform, and update client
-    next();
-  });
-
-  io.on(signal.connection, ioConnection);
-
-  return {server: server, io: io}
-}
+io.on(signal.connection, ioConnection);
 
 
 function ioConnection(socket) {
@@ -104,10 +97,6 @@ function ioConnection(socket) {
           .then((_results) => {
             socket.to(data.connId).emit("turnToken", {data: _results.iceServers}); // emit #5 turnToken (listener: both peer)
             logger.info(`ice servers returned. token.iceServers: ${_results.iceServers}`);
-            consoleLogger("--------------------"); //todo remove dev item
-            consoleLogger("token.username: ", _results.username); //todo remove dev item
-            consoleLogger("token", _results); //todo remove dev item
-            consoleLogger("--------------------"); //todo remove dev item
           });
       } else {
         logger.warn(" FAILED TO LOCATE MATCHING CONNECTION FOR TURN CONNECTION ATTEMPT");
@@ -254,5 +243,3 @@ function listenToConn(socket, next) {
   consoleLogger("------------------------------------------------------------");
   next();
 }
-
-module.exports = start;
