@@ -2,7 +2,7 @@
   "name": "mew-signer-hs",
   "version": "0.0.1",
   "description": "MEW Web socket Signaling server",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
     "android": "nodemon server.js android",
     "android:debug": "DEBUG=* nodemon server.js android",
