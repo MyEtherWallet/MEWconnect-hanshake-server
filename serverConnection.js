@@ -1,61 +1,49 @@
 class ServerConnection {
   constructor(details) {
-    try {
-      console.log("ServerConnection", details);
-      this.connId = details.connId;
-      this.message = details.message;
-      this.initialSigned = details.signed;
-      this.pub = details.pub;
-      this.initiator = details.initiator;
-      this.receiver = details.receiver || undefined;
-      this.requireTurn = false;
-      this.tryTurnSignalCount = 0;
-    } catch (e) {
-      console.error(e);
-    }
+    console.log('ServerConnection', details); // todo remove dev item
+    this.connId = details.connId;
+    this.message = details.message;
+    this.initialSigned = details.signed;
+    this.pub = details.pub;
+    this.initiator = details.initiator;
+    this.receiver = details.receiver || undefined;
+    this.requireTurn = false;
+    this.tryTurnSignalCount = 0;
   }
-
 
   updateConnectionEntry(socketId) {
     try {
-      console.log("updateConnectionEntry");
+      console.log('updateConnectionEntry'); // todo remove dev item
       // ensure only one connection pair exists.  Cause any additional/further attempts to fail.
       if (this.receiver) {
         return false;
-      } else {
-        // update connection entry with socket id of receiver connection
-        this.receiver = socketId;
-        // clients.set(connEntry.connId, connEntry);
-        return true;
       }
+      // update connection entry with socket id of receiver connection
+      this.receiver = socketId;
+      // clients.set(connEntry.connId, connEntry);
+      return true;
     } catch (e) {
-      console.error(e);
+      console.error(e); // todo remove dev item
       return false;
     }
   }
 
-  updateTurnStatus(){
+  updateTurnStatus() {
     this.tryTurnSignalCount = this.tryTurnSignalCount + 1;
     this.requireTurn = true;
   }
 
-  attemptTurn(){
+  attemptTurn() {
     return !this.requireTurn;
   }
 
-  connectionFailure(){
+  connectionFailure() {
     return this.tryTurnSignalCount <= 2;
   }
 
   verifySig(receiver) {
     return this.initialSigned === receiver;
-  };
-
+  }
 }
 
-
-var isNode = typeof global !== "undefined" && ({}).toString.call(global) === '[object global]';
-
-if (isNode) {
-  module.exports = ServerConnection;
-}
+module.exports = ServerConnection;

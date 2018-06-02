@@ -1,4 +1,3 @@
-
 // Signal Server As a exported function;
 
 let loggerMock = {
@@ -8,12 +7,12 @@ let loggerMock = {
   error: console.error
 }
 
-function signalingServer(opts){
+function signalingServer(options) {
   "use strict";
-
-  if(!opts.key || !opts.cert) throw new Error("no SSL details provided to the signaling server");
-  let key = opts.key;
-  let cert = opts.cert ;
+  console.log(options); // todo remove dev item
+  if (!options.server.key || !options.server.cert) throw new Error("no SSL details provided to the signaling server");
+  // let key = options.key;
+  // let cert = options.cert ;
 
 //todo look into refactoring to accept plug-in testing data, and/or testing tools
   require('dotenv').config();
@@ -30,18 +29,20 @@ function signalingServer(opts){
   const clients = new Map();
   const port = process.env.PORT || 3001;
 
-  let options = {
-    key: key,
-    cert: cert ,
+  let serverOptions = Object.assign({
     requestCert: false,
     rejectUnauthorized: false
-  };
+  }, options);
 
-  const server = require('https').createServer(options);
-  const io = require("socket.io")(server, {
+
+  let socketOptions = Object.assign({
     serveClient: false,
     secure: true
-  });
+  }, options.socket || {});
+
+
+  const server = require('https').createServer(serverOptions);
+  const io = require("socket.io")(server,socketOptions);
 
 
   server.listen(port, () => {
