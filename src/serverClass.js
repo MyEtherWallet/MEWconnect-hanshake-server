@@ -1,18 +1,22 @@
 // todo look into refactoring to accept plug-in testing data, and/or testing tools
 require('dotenv').config();
-const {signal, stages, loggerLevels} = require('./signals');
-const {errorLvl, warnLvl, infoLvl, verboseLvl, debugLvl, sillyLvl} = loggerLevels;
+const { signal, stages, loggerLevels } = require('./signals');
+
+const {
+  errorLvl, warnLvl, infoLvl, debugLvl, sillyLvl,
+} = loggerLevels;
 const twilio = require('twilio');
 const ServerConnection = require('./serverConnection');
 const https = require('https');
 const http = require('http');
 const socketIO = require('socket.io');
+
 const port = process.env.PORT || 3001;
 
 class SignalServer {
   constructor(options) {
     this.loggerLevels = loggerLevels;
-    this.logger = options.logger || {log(){}};// {log: console.log};
+    this.logger = options.logger || { log() {} };// {log: console.log};
     this.clients = options.clients || new Map();
     this.port = options.port || port;
     if (!options.server) throw new Error('No config provided for server');
@@ -22,7 +26,6 @@ class SignalServer {
       console.log('using http'); // todo remove dev item
       this.server = http.createServer();
     } else {
-
       this.server = https.createServer(options.server);
     }
 
@@ -50,7 +53,7 @@ class SignalServer {
 
     const accountSid = process.env.TWILIO;
     const authToken = process.env.TWILLO_TOKEN;
-    logger.verbose(accountSid, authToken);
+    this.logger.verbose(accountSid, authToken);
     const client = twilio(accountSid, authToken);
 
     return client.tokens
@@ -95,11 +98,11 @@ class SignalServer {
       this.logger.log(debugLvl, 'RECEIVER CONNECTION');
 
       const connInstance = this.locateMatchingConnection(details.connId);
-      if (connInstance /*&& connInstance.verifySig(details.signed)*/) {
+      if (connInstance /* && connInstance.verifySig(details.signed) */) {
         this.logger.log(sillyLvl, connInstance);
         this.logger.log(sillyLvl, details);
         // emit #1 handshake  (listener: receiver peer)
-        socket.emit(signal.handshake, {toSign: connInstance.message});
+        socket.emit(signal.handshake, { toSign: connInstance.message });
       } else {
         this.logger.log(debugLvl, `NO INITIATOR CONNECTION FOUND FOR ${details.connId}`);
         this.logger.log(sillyLvl, 'current client map: ', this.clients);
@@ -123,14 +126,16 @@ class SignalServer {
           this.logger.log(debugLvl, 'PAIR CONNECTION VERIFIED');
           const canUpdate = connInstance.updateConnectionEntry(socket.id);
           if (canUpdate) {
-            if(Reflect.has(details, "version")){
+            if (Reflect.has(details, 'version')) {
               // emit #2  confirmation (listener: initiator peer)
-              socket.to(details.connId).emit(signal.confirmation, {connId: connInstance.connId, version: details.version});
+              socket.to(details.connId).emit(signal.confirmation, {
+                connId: connInstance.connId,
+                version: details.version,
+              });
             } else {
               // emit #2  confirmation (listener: initiator peer)
-              socket.to(details.connId).emit(signal.confirmation, {connId: connInstance.connId});
+              socket.to(details.connId).emit(signal.confirmation, { connId: connInstance.connId });
             }
-
           } else {
             // emit confirmationFailedBusy
             console.log('CONFIRMATION FAILED: BUSY'); // todo remove dev item
@@ -166,35 +171,34 @@ class SignalServer {
         default:
           console.log('Invalid Stage Supplied'); // todo remove dev item
           this.logger.log(errorLvl, 'Invalid Stage Supplied');
-         return;
+          return;
       }
 
       socket.on(signal.signature, (data) => {
-        this.logger.log(sillyLvl,'receiverConfirm', data); // todo remove dev item
+        this.logger.log(sillyLvl, 'receiverConfirm', data); // todo remove dev item
         this.receiverConfirm(socket, data);
       });
 
       socket.on(signal.offerSignal, (offerData) => {
         this.logger.log(infoLvl, 'OFFER: ', offerData);
         // emit #3 offer (listener: receiver peer)
-        this.io.to(offerData.connId).emit(signal.offer, {data: offerData.data});
+        this.io.to(offerData.connId).emit(signal.offer, { data: offerData.data });
       });
 
       socket.on(signal.answerSignal, (answerData) => {
         this.logger.log(infoLvl, 'ANSWER: ', answerData);
         // emit #4 answer (listener: initiator peer)
-        this.io.to(answerData.connId).emit(signal.answer, {data: answerData.data});
+        this.io.to(answerData.connId).emit(signal.answer, { data: answerData.data });
       });
 
       socket.on(signal.rtcConnected, (connId) => {
         // Clean up client record
-/*        console.log(socket.handshake); // todo remove dev item
+        /*        console.log(socket.handshake); // todo remove dev item
         console.log(socket.rooms); // todo remove dev item
-        console.log(socket.adapter); // todo remove dev item*/
+        console.log(socket.adapter); // todo remove dev item */
         this.clients.delete(connId);
         socket.leave(connId);
         console.log('rtcConnected'); // todo remove dev item
-
       });
 
       socket.on(signal.disconnect, (reason) => {
@@ -204,16 +208,16 @@ class SignalServer {
 
       socket.on(signal.tryTurn, (connData) => {
         // emit #4 answer (listener: initiator peer)
-        socket.to(connData.connId).emit(signal.attemptingTurn, {data: null});
+        socket.to(connData.connId).emit(signal.attemptingTurn, { data: null });
 
         const connItem = this.locateMatchingConnection(connData.connId);
-       /* console.log(connItem); // todo remove dev item*/
+        /* console.log(connItem); // todo remove dev item */
         if (connItem !== undefined) {
           connItem.updateTurnStatus();
           this.createTurnConnection()
             .then((_results) => {
               // emit #5 turnToken (listener: both peer)
-              socket.to(connData.connId).emit(signal.turnToken, {data: _results.iceServers});
+              socket.to(connData.connId).emit(signal.turnToken, { data: _results.iceServers });
               this.logger.log(infoLvl, `ice servers returned. token.iceServers: ${_results.iceServers}`);
             });
         } else {
@@ -232,7 +236,6 @@ class SignalServer {
     this.logger.log(debugLvl, '------------------------------------------------------------');
     next();
   }
-
 }
 
 module.exports = SignalServer;
