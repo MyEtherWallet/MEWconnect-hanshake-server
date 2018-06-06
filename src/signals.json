@@ -13,6 +13,7 @@
     "disconnect": "disconnect",
     "handshake": "handshake",
     "confirmation": "confirmation",
+    "socketTimeout" : "socketTimeout",
     "invalidConnection": "InvalidConnection",
     "confirmationFailedBusy": "confirmationFailedBusy",
     "confirmationFailed": "confirmationFailed"

@@ -1,52 +1,24 @@
 {
-  "name": "mew-signer-hs",
+  "name": "MEWconnect-Signal-Server",
   "version": "0.0.1",
-  "description": "MEW Web socket Signaling server",
-  "main": "index.js",
+  "private": true,
   "scripts": {
-    "android": "nodemon server.js android",
-    "android:debug": "DEBUG=* nodemon server.js android",
-    "android:inspect": "nodemon --inspect server.js android",
-    "android:debuginspect": "DEBUG=* nodemon --inspect server.js android",
-    "start:dev": "nodemon server.js",
-    "start": "node server.js",
-    "inspect": "nodemon --inspect server.js",
-    "debug": "DEBUG=* nodemon --inspect server.js",
-    "docs": "jsdoc -c ./jsdoc.json"
+    "start": "node ./example/example.js"
   },
   "dependencies": {
+    "debug": "~2.6.9",
     "dotenv": "^5.0.1",
     "eccrypto": "^1.0.3",
-    "express": "^4.16.2",
-    "http": "0.0.0",
-    "nodemon": "^1.17.1",
-    "safe-buffer": "^5.1.1",
+    "ethereumjs-util": "^5.1.5",
+    "morgan": "~1.9.0",
     "secp256k1": "^3.5.0",
-    "simple-peer": "^9.0.0",
     "socket.io": "^2.0.4",
-    "socket.io-client": "^2.0.4",
-    "twilio": "^3.14.0",
-    "web3": "^1.0.0-beta.30",
-    "webpack": "^4.1.1",
-    "webpack-merge": "^4.1.2",
-    "winston": "^2.4.1"
+    "winston": "^2.4.2"
   },
   "devDependencies": {
     "eslint": "^4.19.1",
     "eslint-config-airbnb-base": "^12.1.0",
-    "eslint-plugin-import": "^2.12.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/MyEtherWallet/mew-signer-hs.git"
-  },
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/MyEtherWallet/mew-signer-hs/issues"
-  },
-  "engines": {
-    "node": "8.9.1"
-  },
-  "homepage": "https://github.com/MyEtherWallet/mew-signer-hs#readme"
+    "eslint-plugin-import": "^2.12.0",
+    "twilio": "^3.17.1"
+  }
 }

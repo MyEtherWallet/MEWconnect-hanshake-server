@@ -1,6 +1,6 @@
 class ServerConnection {
   constructor(details) {
-    console.log('ServerConnection', details); // todo remove dev item
+    // console.log('ServerConnection', details); // todo remove dev item
     this.connId = details.connId;
     this.message = details.message;
     this.initialSigned = details.signed;
@@ -13,7 +13,7 @@ class ServerConnection {
 
   updateConnectionEntry(socketId) {
     try {
-      console.log('updateConnectionEntry'); // todo remove dev item
+      // console.log('updateConnectionEntry'); // todo remove dev item
       // ensure only one connection pair exists.  Cause any additional/further attempts to fail.
       if (this.receiver) {
         return false;

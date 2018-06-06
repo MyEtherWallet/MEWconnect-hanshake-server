@@ -5,35 +5,43 @@ const {errorLvl, warnLvl, infoLvl, verboseLvl, debugLvl, sillyLvl} = loggerLevel
 const twilio = require('twilio');
 const ServerConnection = require('./serverConnection');
 const https = require('https');
+const http = require('http');
 const socketIO = require('socket.io');
 const port = process.env.PORT || 3001;
-
-
 
 class SignalServer {
   constructor(options) {
     this.loggerLevels = loggerLevels;
-    this.logger = options.logger || {log(){}};
+    this.logger = options.logger || {log(){}};// {log: console.log};
     this.clients = options.clients || new Map();
-    if(!options.server) throw new Error("No config provided for server")
-    if(!options.socket) throw new Error("No config provided for socket.io")
-    this.server = https.createServer(options.server);
-    this.io = socketIO(this.server, options.socket);
+    this.port = options.port || port;
+    if (!options.server) throw new Error('No config provided for server');
+    if (!options.socket) throw new Error('No config provided for socket.io');
 
-    this.server.listen(port, () => {
-      console.log(`Listening on ${port}`);
+    if (options.server.http) {
+      console.log('using http'); // todo remove dev item
+      this.server = http.createServer();
+    } else {
+
+      this.server = https.createServer(options.server);
+    }
+
+    this.io = socketIO(this.server, options.socket);
+    this.server.listen(this.port, () => {
+      console.log(this.server.address()); // todo remove dev item
+      console.log(`Listening on ${this.port}`);
     });
 
     this.io.use(this.listenToConn.bind(this)); // debuging usage (non-functional)
     this.io.use((socket, next) => {
-      this.logger.log(sillyLvl, socket);
+      // this.logger.log(sillyLvl, socket);
       next();
     });
 
     this.io.on(signal.connection, this.ioConnection.bind(this));
   }
 
-  static create(options){
+  static create(options) {
     return new SignalServer(options);
   }
 
@@ -56,14 +64,14 @@ class SignalServer {
       details.initiator = socketId;
       const connectionInstance = new ServerConnection(details);
       this.clients.set(details.connId, connectionInstance);
-      this.logger.log(sillyLvl,'current client map: ', this.clients);
+      this.logger.log(sillyLvl, 'current client map: ', this.clients);
     } catch (e) {
       this.logger.log(errorLvl, e);
     }
   }
 
   locateMatchingConnection(connId) {
-    this.logger.log(sillyLvl,'current client map: ', this.clients);
+    this.logger.log(sillyLvl, 'current client map: ', this.clients);
     if (this.clients.has(connId)) {
       this.logger.log(debugLvl, 'CONNECTION FOUND');
       return this.clients.get(connId);
@@ -74,6 +82,7 @@ class SignalServer {
 
   initiatorIncomming(socket, details) {
     try {
+      this.logger.log(debugLvl, 'INITIATOR CONNECTION');
       this.createConnectionEntry(details, socket.id);
       socket.join(details.connId);
     } catch (e) {
@@ -84,13 +93,17 @@ class SignalServer {
   receiverIncomming(socket, details) {
     try {
       this.logger.log(debugLvl, 'RECEIVER CONNECTION');
+
       const connInstance = this.locateMatchingConnection(details.connId);
-      if (connInstance) {
+      if (connInstance /*&& connInstance.verifySig(details.signed)*/) {
+        this.logger.log(sillyLvl, connInstance);
+        this.logger.log(sillyLvl, details);
         // emit #1 handshake  (listener: receiver peer)
         socket.emit(signal.handshake, {toSign: connInstance.message});
       } else {
-        this.logger.log(debugLvl,`NO INITIATOR CONNECTION FOUND FOR ${details.connId}`);
-        this.logger.log(sillyLvl,'current client map: ', this.clients);
+        this.logger.log(debugLvl, `NO INITIATOR CONNECTION FOUND FOR ${details.connId}`);
+        this.logger.log(sillyLvl, 'current client map: ', this.clients);
+        console.log(`NO INITIATOR CONNECTION FOUND FOR ${details.connId}`); // todo remove dev item
         socket.emit(signal.invalidConnection); // emit InvalidConnection
       }
     } catch (e) {
@@ -98,6 +111,7 @@ class SignalServer {
     }
   }
 
+  // This may now be redundant
   receiverConfirm(socket, details) {
     try {
       this.logger.log(debugLvl, 'RECEIVER CONFIRM');
@@ -109,19 +123,28 @@ class SignalServer {
           this.logger.log(debugLvl, 'PAIR CONNECTION VERIFIED');
           const canUpdate = connInstance.updateConnectionEntry(socket.id);
           if (canUpdate) {
-            // emit #2  confirmation (listener: initiator peer)
-            socket.to(details.connId).emit(signal.confirmation, {connId: connInstance.connId});
+            if(Reflect.has(details, "version")){
+              // emit #2  confirmation (listener: initiator peer)
+              socket.to(details.connId).emit(signal.confirmation, {connId: connInstance.connId, version: details.version});
+            } else {
+              // emit #2  confirmation (listener: initiator peer)
+              socket.to(details.connId).emit(signal.confirmation, {connId: connInstance.connId});
+            }
+
           } else {
             // emit confirmationFailedBusy
+            console.log('CONFIRMATION FAILED: BUSY'); // todo remove dev item
             socket.to(details.connId).emit(signal.confirmationFailedBusy);
           }
         } else {
           this.logger.log(debugLvl, 'CONNECTION VERIFY FAILED');
+          console.log('CONNECTION VERIFY FAILED'); // todo remove dev item
           socket.emit(signal.confirmationFailed); // emit confirmationFailed
         }
       } else {
-        this.logger.log(sillyLvl,'current client map: ', this.clients);
+        this.logger.log(sillyLvl, 'current client map: ', this.clients);
         this.logger.log(debugLvl, 'NO CONNECTION DETAILS PROVIDED');
+        console.log('NO CONNECTION DETAILS PROVIDED'); // todo remove dev item
         socket.emit(signal.invalidConnection); // emit InvalidConnection
       }
     } catch (e) {
@@ -141,11 +164,13 @@ class SignalServer {
           this.receiverIncomming(socket, token);
           break;
         default:
+          console.log('Invalid Stage Supplied'); // todo remove dev item
           this.logger.log(errorLvl, 'Invalid Stage Supplied');
-          break;
+         return;
       }
 
       socket.on(signal.signature, (data) => {
+        this.logger.log(sillyLvl,'receiverConfirm', data); // todo remove dev item
         this.receiverConfirm(socket, data);
       });
 
@@ -163,8 +188,13 @@ class SignalServer {
 
       socket.on(signal.rtcConnected, (connId) => {
         // Clean up client record
+/*        console.log(socket.handshake); // todo remove dev item
+        console.log(socket.rooms); // todo remove dev item
+        console.log(socket.adapter); // todo remove dev item*/
         this.clients.delete(connId);
         socket.leave(connId);
+        console.log('rtcConnected'); // todo remove dev item
+
       });
 
       socket.on(signal.disconnect, (reason) => {
@@ -177,7 +207,7 @@ class SignalServer {
         socket.to(connData.connId).emit(signal.attemptingTurn, {data: null});
 
         const connItem = this.locateMatchingConnection(connData.connId);
-        console.log(connItem); // todo remove dev item
+       /* console.log(connItem); // todo remove dev item*/
         if (connItem !== undefined) {
           connItem.updateTurnStatus();
           this.createTurnConnection()
