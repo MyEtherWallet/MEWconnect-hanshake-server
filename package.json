@@ -10,16 +10,16 @@
     "dotenv": "^5.0.1",
     "eccrypto": "^1.0.3",
     "ethereumjs-util": "^5.1.5",
+    "ioredis": "^3.2.2",
     "morgan": "~1.9.0",
     "secp256k1": "^3.5.0",
     "socket.io": "^2.0.4",
-    "winston": "^2.4.2",
-    "twilio": "^3.17.1"
+    "twilio": "^3.17.1",
+    "winston": "^2.4.2"
   },
   "devDependencies": {
     "eslint": "^4.19.1",
     "eslint-config-airbnb-base": "^12.1.0",
     "eslint-plugin-import": "^2.12.0"
-
   }
 }

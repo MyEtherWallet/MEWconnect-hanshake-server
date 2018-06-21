@@ -16,7 +16,7 @@ const port = process.env.PORT || 3001;
 class SignalServer {
   constructor(options) {
     this.loggerLevels = loggerLevels;
-    this.logger = options.logger || { log() {} };// {log: console.log};
+    this.logger = options.logger ||  {log: console.log}; // { log() {} };
     this.clients = options.clients || new Map();
     this.port = options.port || port;
     if (!options.server) throw new Error('No config provided for server');
@@ -49,15 +49,20 @@ class SignalServer {
   }
 
   createTurnConnection() {
-    this.logger.log(debugLvl, 'CREATE TURN CONNECTION');
+    try {
+      this.logger.log(debugLvl, 'CREATE TURN CONNECTION');
 
-    const accountSid = process.env.TWILIO;
-    const authToken = process.env.TWILLO_TOKEN;
-    this.logger.verbose(accountSid, authToken);
-    const client = twilio(accountSid, authToken);
+      const accountSid = process.env.TWILIO;
+      const authToken = process.env.TWILLO_TOKEN;
+      // this.logger.verbose(accountSid, authToken);
+      const client = twilio(accountSid, authToken);
 
-    return client.tokens
-      .create();
+      return client.tokens
+        .create();
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
   }
 
   createConnectionEntry(details, socketId) {
@@ -74,13 +79,18 @@ class SignalServer {
   }
 
   locateMatchingConnection(connId) {
-    this.logger.log(sillyLvl, 'current client map: ', this.clients);
-    if (this.clients.has(connId)) {
-      this.logger.log(debugLvl, 'CONNECTION FOUND');
-      return this.clients.get(connId);
+    try {
+      this.logger.log(sillyLvl, 'current client map: ', this.clients);
+      if (this.clients.has(connId)) {
+        this.logger.log(debugLvl, 'CONNECTION FOUND');
+        return this.clients.get(connId);
+      }
+      this.logger.log(debugLvl, 'NO MATCHING CONNECTION');
+      return false;
+    } catch (e) {
+      console.error(e);
+      return null;
     }
-    this.logger.log(debugLvl, 'NO MATCHING CONNECTION');
-    return false;
   }
 
   initiatorIncomming(socket, details) {
@@ -213,13 +223,18 @@ class SignalServer {
         const connItem = this.locateMatchingConnection(connData.connId);
         /* console.log(connItem); // todo remove dev item */
         if (connItem !== undefined) {
-          connItem.updateTurnStatus();
-          this.createTurnConnection()
-            .then((_results) => {
-              // emit #5 turnToken (listener: both peer)
-              socket.to(connData.connId).emit(signal.turnToken, { data: _results.iceServers });
-              this.logger.log(infoLvl, `ice servers returned. token.iceServers: ${_results.iceServers}`);
-            });
+          // Catch error in getting turn credentials
+          try {
+            connItem.updateTurnStatus();
+            this.createTurnConnection()
+              .then((_results) => {
+                // emit #5 turnToken (listener: both peer)
+                socket.to(connData.connId).emit(signal.turnToken, { data: _results.iceServers });
+                this.logger.log(infoLvl, `ice servers returned. token.iceServers: ${_results.iceServers}`);
+              });
+          } catch (e) {
+            console.error(e);
+          }
         } else {
           this.logger.log(warnLvl, ' FAILED TO LOCATE MATCHING CONNECTION FOR TURN CONNECTION ATTEMPT');
           this.logger.log(warnLvl, ` connectiono ID. data.connId: ${connData.connId}`);
