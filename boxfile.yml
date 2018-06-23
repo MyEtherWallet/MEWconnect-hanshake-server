@@ -1,0 +1,24 @@
+run.config:
+  build_triggers:
+    - package.json
+  cache_dirs:
+    - node_modules
+  engine: nodejs
+  engine.config:
+    dep_manager: npm
+    runtime: nodejs-8.9
+  extra_packages:
+    - bash
+  extra_steps:
+    - "npm install"
+data.redis:
+  image: nanobox/redis
+  config:
+    version: 3.0
+web.api:
+  ports:
+    - "tcp:3000:3200"
+  routes:
+    - /
+  start:
+    - "bash -c 'npm start'"

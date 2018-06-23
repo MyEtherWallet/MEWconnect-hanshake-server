@@ -20,14 +20,16 @@ let serverOptions = {
 
 let redisOptions = {
   host: process.env.DATA_REDIS_HOST,
-  port: 6379
+  port: 6379,
+  timeout: 10
 }
+
 
 let socketOptions = {
   serveClient: false,
   secure: true
 }
 
-const server = serverSig.create({port: 3200, redis: redisOptions, server: serverOptions, socket: socketOptions});
+const serverOne = serverSig.create({port: 3200, redis: redisOptions, server: serverOptions, socket: socketOptions});
 
-
+const serverTwo = serverSig.create({port: 3300, redis: redisOptions, server: serverOptions, socket: socketOptions});
