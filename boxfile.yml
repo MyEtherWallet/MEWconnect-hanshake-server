@@ -14,11 +14,11 @@ run.config:
   extra_steps:
     - npm install && npm run build
 data.redis :
-  image : nanobox/redis:3.2
+  image : nanobox/redis:4.0
 web.api:
 #  ports:
 #    - "tcp:8080:3200"
-#  routes:
-#    - /socket.io
+  routes:
+    - /
   start:
     - "bash -c 'npm start'"
