@@ -9,8 +9,12 @@ run.config:
     runtime: nodejs-8.9
   extra_packages:
     - bash
+  build_triggers:
+    - package.json
   extra_steps:
-    - "npm install"
+    - cd npm install
+    - cd client && npm run build
+    - cd server && npm install
 data.redis:
   image: nanobox/redis
   config:

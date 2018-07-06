@@ -1,18 +1,18 @@
-// const redis = require("redis");
-require('dotenv').config();
-const Redis = require('ioredis')
-const {promisify} = require('util')
+import Redis from 'ioredis'
+import dotenv from 'dotenv'
 
-class RedisClient {
+dotenv.config()
+
+export default class RedisClient {
   constructor (options) {
     this.options = options || {}
     // this.client = redis.createClient();
-    this.timeout = this.options.timeout ? this.options.timeout : process.env.CONNECTION_TIMEOUT || 60;
-    console.log(`Redis Timeout: ${this.timeout} seconds`); // todo remove dev item
+    this.timeout = this.options.timeout ? this.options.timeout : process.env.CONNECTION_TIMEOUT || 60
+    console.log(`Redis Timeout: ${this.timeout} seconds`) // todo remove dev item
     this.client = new Redis({
       port: this.options.port || 6379, // Redis port
       host: this.options.host || '127.0.0.1', // Redis host
-      family: this.options.family ||  4, // 4 (IPv4) or 6 (IPv6)
+      family: this.options.family || 4, // 4 (IPv4) or 6 (IPv6)
       db: this.options.db || 0
     })
 
@@ -21,7 +21,7 @@ class RedisClient {
       console.log('REDIS READY ')
       // console.log(this.client.getBuiltinCommands()) // todo remove dev item
     })
-    this.client.on('error', err => {
+    this.client.on('error', (err) => {
       console.log(err)
     })
     this.client.on('connect', () => {
@@ -46,15 +46,14 @@ class RedisClient {
   }
 
   createConnectionEntry (details, socketId) {
-
-    let connId = details.connId
-    let message = details.message
-    let initialSigned = details.signed
-    let pub = details.pub
-    let initiator = socketId
-    let receiver = details.receiver || undefined
-    let requireTurn = false
-    let tryTurnSignalCount = 0
+    const connId = details.connId
+    const message = details.message
+    const initialSigned = details.signed
+    const pub = details.pub
+    const initiator = socketId
+    const receiver = details.receiver || undefined
+    const requireTurn = false
+    const tryTurnSignalCount = 0
     // this.client
     // console.log(this.client.hsetnx.toString()); // todo remove dev item
     return this.client.hset(
@@ -72,10 +71,10 @@ class RedisClient {
       'tryTurnSignalCount',
       tryTurnSignalCount
     )
-      .then(_result =>{
+      .then((_result) => {
         this.client.expire(connId, this.timeout)
-          .then(_expireSet =>{
-            console.log("expire set: ", _expireSet); // todo remove dev item
+          .then((_expireSet) => {
+            console.log('expire set: ', _expireSet) // todo remove dev item
             return _result
           })
       })
@@ -83,41 +82,34 @@ class RedisClient {
 
   verifySig (connId, sig) {
     return this.client.hgetall(connId)
-      .then(_result => {
+      .then((_result) => {
         console.log('_result', _result) // todo remove dev item
         if (typeof _result === 'object') {
-          if (_result['initialSigned'] === sig) {
+          if (_result.initialSigned === sig) {
             return this.client.hset(connId, 'verified', true)
-              .then(_result => {
-                return true
-              })
-          } else {
-            return false
+              .then(_result => true)
           }
-        } else {
           return false
         }
-
+        return false
       })
     // return this.initialSigned === receiver;
   }
 
   locateMatchingConnection (connId) {
     return this.client.exists(connId)
-      .then(_result => {
+      .then((_result) => {
         if (_result === 1) {
           return true
-        } else {
-          return false
         }
+        return false
       })
   }
 
   updateConnectionEntry (connId, socketId) {
-
     try {
       return this.client.hexists(connId, 'receiver')
-        .then(_result => {
+        .then((_result) => {
           console.log('updateConnectionEntry exists check', _result) // todo remove dev item
           if (_result === 0) {
             return this.client.hset(
@@ -125,19 +117,14 @@ class RedisClient {
               'receiver',
               socketId
             )
-              .then(_response => {
-                return true
-              })
-          } else {
-            return false
+              .then(_response => true)
           }
-
+          return false
         })
     } catch (e) {
       console.error(e) // todo remove dev item
       return false
     }
-
   }
 
   updateTurnStatus (connId) {
@@ -146,32 +133,33 @@ class RedisClient {
       'requireTurn',
       true
     )
-      .then(_response => {
-        console.log(_response); // todo remove dev item
+      .then((_response) => {
+        console.log(_response) // todo remove dev item
         return this.client.hincrby(
           connId,
           'tryTurnSignalCount',
           1
         )
       })
-      // .then(_response => {
-      //   return true
-      // })
+    // .then(_response => {
+    //   return true
+    // })
   }
 
   removeConnectionEntry (connId) {
-    return this.client.hdel(connId,
+    return this.client.hdel(
+      connId,
       'initiator',
       'receiver',
       'initialSigned',
       'requireTurn',
-      'tryTurnSignalCount')
-      .then(_result => {
+      'tryTurnSignalCount'
+    )
+      .then((_result) => {
         if (_result >= 3) {
           return true
-        } else {
-          return false
         }
+        return false
       })
   }
 
@@ -212,5 +200,3 @@ class RedisClient {
     return this.client.hdel(previousHex, key)
   }
 }
-
-module.exports = RedisClient

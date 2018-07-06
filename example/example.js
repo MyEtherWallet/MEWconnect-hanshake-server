@@ -1,33 +1,31 @@
-"use strict";
-
 
 
 const fs = require('fs');
-const path = require('path')
-const serverSig = require("../src/serverClass.js")
+const path = require('path');
+const serverSig = require('../dist/serverClass.js');
 
-let key = fs.readFileSync(path.resolve(__dirname, "../sampleCerts/devCert.key"))
-let cert = fs.readFileSync(path.resolve(__dirname, "../sampleCerts/devCert.cert"))
+const key = fs.readFileSync(path.resolve(__dirname, '../sampleCerts/devCert.key'));
+const cert = fs.readFileSync(path.resolve(__dirname, '../sampleCerts/devCert.cert'));
 
 
-
-let serverOptions = {
+const serverOptions = {
   requestCert: false,
   rejectUnauthorized: false,
-  key: key,
-  cert: cert
-}
+  key,
+  cert,
+};
 
-let redisOptions = {
+const redisOptions = {
   host: process.env.DATA_REDIS_HOST,
-  port: 6379
-}
+  port: 6379,
+};
 
-let socketOptions = {
+const socketOptions = {
   serveClient: false,
-  secure: true
-}
+  secure: true,
+};
 
-const server = serverSig.create({port: 3200, redis: redisOptions, server: serverOptions, socket: socketOptions});
-
+const server = serverSig.create({
+  port: 3200, redis: redisOptions, server: serverOptions, socket: socketOptions,
+});
 

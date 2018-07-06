@@ -3,7 +3,13 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "start": "node ./example/example.js"
+    "build": "rimraf dist/ && babel ./src --out-dir dist/",
+    "start": "npm run build && node ./example/example.js",
+    "prod": "node dist/index.js",
+    "events": "npm run build && node dist/simplex_events/index.js",
+    "eventsProd": "node dist/simplex_events/",
+    "dev": "env NODE_ENV=development nodemon --exec npm start",
+    "test": "env NODE_ENV=development mocha --exit --require babel-core/register test/*"
   },
   "dependencies": {
     "debug": "~2.6.9",
@@ -11,6 +17,7 @@
     "eccrypto": "^1.0.3",
     "ethereumjs-util": "^5.1.5",
     "ioredis": "^3.2.2",
+    "logging": "^3.2.0",
     "morgan": "~1.9.0",
     "secp256k1": "^3.5.0",
     "socket.io": "^2.0.4",
@@ -19,9 +26,18 @@
     "winston": "^2.4.2"
   },
   "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-plugin-transform-object-rest-spread": "^6.26.0",
+    "babel-preset-es2015": "^6.24.1",
     "chai": "^4.1.2",
     "eslint": "^4.19.1",
     "eslint-config-airbnb-base": "^12.1.0",
-    "eslint-plugin-import": "^2.12.0"
+    "eslint-config-standard": "^11.0.0",
+    "eslint-plugin-import": "^2.13.0",
+    "eslint-plugin-mocha": "^5.0.0",
+    "eslint-plugin-node": "^6.0.1",
+    "eslint-plugin-promise": "^3.8.0",
+    "eslint-plugin-standard": "^3.1.0",
+    "mocha": "^5.2.0"
   }
 }

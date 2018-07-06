@@ -1,4 +1,5 @@
-const winston = require('winston');
+import winston from 'winston'
+// const winston = require('winston');
 
 const errorLogger = new winston.transports.File({
   handleExceptions: true,
@@ -7,36 +8,36 @@ const errorLogger = new winston.transports.File({
   timestamp: true,
   filename: './server.log',
   maxsize: 10000,
-  zippedArchive: true,
+  zippedArchive: true
   // json: true,
-});
+})
 
 const logger = new winston.Logger({
   transports: [
     // infoLogger,
-    errorLogger,
+    errorLogger
   ],
-  exitOnError: false,
-});
+  exitOnError: false
+})
 
-function consoleLoggerWrap(logToConsole) {
-  return function consoleLogger(tag, content) {
+function consoleLoggerWrap (logToConsole) {
+  return function consoleLogger (tag, content) {
     if (logToConsole) {
       if (!content) {
-        console.log(tag);
+        console.log(tag)
       } else {
-        console.log(tag, content);
+        console.log(tag, content)
       }
     } else if (!content) {
-      logger.verbose(`TAG: ${tag}`);
+      logger.verbose(`TAG: ${tag}`)
     } else {
-      logger.verbose(`TAG: ${tag}`);
-      logger.verbose(content);
+      logger.verbose(`TAG: ${tag}`)
+      logger.verbose(content)
     }
-  };
+  }
 }
 
-module.exports = {
+export {
   consoleLoggerWrap,
-  logger,
-};
+  logger
+}

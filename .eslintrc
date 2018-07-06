@@ -4,5 +4,10 @@
     "no-underscore-dangle": "off",
       "prefer-destructuring": ["error", {"object": false, "array": false}]
   },
-  "extends": "airbnb-base"
+  "extends": "standard",
+  "env":{
+    "node": true,
+    "mocha": true,
+    "es6": true
+  }
 }
