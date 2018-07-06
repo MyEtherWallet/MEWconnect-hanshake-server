@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "rimraf dist/ && babel ./src --out-dir dist/",
-    "start": "npm run build && node ./example/example.js",
+    "start": "npm run build && node ./dist/index.js",
     "prod": "node dist/index.js",
     "events": "npm run build && node dist/simplex_events/index.js",
     "eventsProd": "node dist/simplex_events/",

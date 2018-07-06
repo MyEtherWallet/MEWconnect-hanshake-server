@@ -1,14 +1,17 @@
 import Redis from 'ioredis'
 import dotenv from 'dotenv'
+import createLogger from 'logging'
+const logger = createLogger('Redis')
 
 dotenv.config()
 
 export default class RedisClient {
   constructor (options) {
+    console.log(Redis) // todo remove dev item
+    this.connectionErrorCounter = 0
     this.options = options || {}
-    // this.client = redis.createClient();
     this.timeout = this.options.timeout ? this.options.timeout : process.env.CONNECTION_TIMEOUT || 60
-    console.log(`Redis Timeout: ${this.timeout} seconds`) // todo remove dev item
+    logger.info(`Redis Timeout: ${this.timeout} seconds`)
     this.client = new Redis({
       port: this.options.port || 6379, // Redis port
       host: this.options.host || '127.0.0.1', // Redis host
@@ -16,29 +19,24 @@ export default class RedisClient {
       db: this.options.db || 0
     })
 
-    // this.client.unref();
     this.client.on('ready', () => {
-      console.log('REDIS READY ')
-      // console.log(this.client.getBuiltinCommands()) // todo remove dev item
+      logger.info('REDIS READY ')
     })
     this.client.on('error', (err) => {
-      console.log(err)
+      if (err.code === 'ECONNREFUSED') {
+        console.log(this.connectionErrorCounter) // todo remove dev item
+        if (this.connectionErrorCounter > 100) process.exit(1)
+        this.connectionErrorCounter++
+      }
+      console.log(err) // todo remove dev item
+      logger.error(err)
     })
     this.client.on('connect', () => {
-      console.log('Client Connected')
+      logger.info('Client Connected')
     })
     this.client.on('end', () => {
-      console.log('connection closed')
+      logger.info('connection closed')
     })
-
-    // if(this.options.monitor){
-    //     this.client.monitor(function (err, res) {
-    //         console.log("Entering monitoring mode.");
-    //     });
-    //     this.client.on("monitor", function (time, args, raw_reply) {
-    //         console.log(time + ": " + args); // 1458910076.446514:['set', 'foo', 'bar']
-    //     });
-    // }
   }
 
   disconnect () {
@@ -49,15 +47,12 @@ export default class RedisClient {
     const connId = details.connId
     const message = details.message
     const initialSigned = details.signed
-    const pub = details.pub
     const initiator = socketId
-    const receiver = details.receiver || undefined
+    // const receiver = details.receiver || undefined
     const requireTurn = false
     const tryTurnSignalCount = 0
-    // this.client
-    // console.log(this.client.hsetnx.toString()); // todo remove dev item
-    return this.client.hset(
-      connId,
+    console.log(details, socketId) // todo remove dev item
+    const hsetArgs = [
       'initiator',
       initiator,
       // 'receiver',
@@ -69,13 +64,17 @@ export default class RedisClient {
       'requireTurn',
       requireTurn,
       'tryTurnSignalCount',
-      tryTurnSignalCount
-    )
+      tryTurnSignalCount]
+    console.log( connId, JSON.stringify(hsetArgs)) // todo remove dev item
+
+    return this.client.hset(connId, hsetArgs)
       .then((_result) => {
         this.client.expire(connId, this.timeout)
           .then((_expireSet) => {
-            console.log('expire set: ', _expireSet) // todo remove dev item
             return _result
+          })
+          .catch(error => {
+            logger.error('createConnectionEntry', {error})
           })
       })
   }
@@ -83,17 +82,15 @@ export default class RedisClient {
   verifySig (connId, sig) {
     return this.client.hgetall(connId)
       .then((_result) => {
-        console.log('_result', _result) // todo remove dev item
         if (typeof _result === 'object') {
           if (_result.initialSigned === sig) {
             return this.client.hset(connId, 'verified', true)
-              .then(_result => true)
+              .then(_result => { return Promise.resolve(true) })
           }
           return false
         }
         return false
       })
-    // return this.initialSigned === receiver;
   }
 
   locateMatchingConnection (connId) {
@@ -110,19 +107,18 @@ export default class RedisClient {
     try {
       return this.client.hexists(connId, 'receiver')
         .then((_result) => {
-          console.log('updateConnectionEntry exists check', _result) // todo remove dev item
           if (_result === 0) {
             return this.client.hset(
               connId,
               'receiver',
               socketId
             )
-              .then(_response => true)
+              .then(_response => { return Promise.resolve(true) })
           }
           return false
         })
     } catch (e) {
-      console.error(e) // todo remove dev item
+      logger.error('updateConnectionEntry', {e})
       return false
     }
   }
@@ -141,9 +137,6 @@ export default class RedisClient {
           1
         )
       })
-    // .then(_response => {
-    //   return true
-    // })
   }
 
   removeConnectionEntry (connId) {

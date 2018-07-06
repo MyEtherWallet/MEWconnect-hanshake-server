@@ -7,7 +7,7 @@ import socketIO from 'socket.io'
 import redisAdapter from 'socket.io-redis'
 
 import RedisClient from './redisClient'
-import { redis, server, socket, signal, stages } from '../config'
+import { redis, server, socket, signal, stages } from './config'
 dotenv.config()
 
 const logger = createLogger('SignalServer')
@@ -18,6 +18,7 @@ export default class SignalServer {
     this.logger = options.logger || logger
     this.clients = options.clients || new Map()
     this.port = server.port || 8080
+    this.host = server.host || 'localhost'
 
     this.server = http.createServer()
 
@@ -25,7 +26,7 @@ export default class SignalServer {
 
     this.io = socketIO(this.server, socket)
     if (options.redis) this.io.adapter(redisAdapter({ host: redis.host, port: redis.port }))
-    this.server.listen(this.port, () => {
+    this.server.listen({host: this.host, port: this.port}, () => {
       this.logger.info(this.server.address()) // todo remove dev item
       this.logger.info(`Listening on ${this.port}`)
     })
@@ -66,7 +67,7 @@ export default class SignalServer {
           socket.join(details.connId)
         })
     } catch (e) {
-      this.logger.error('', {e})
+      this.logger.error('initiatorIncomming', {e})
     }
   }
 
@@ -90,7 +91,7 @@ export default class SignalServer {
           }
         })
     } catch (e) {
-      this.logger.error('', {e})
+      this.logger.error('receiverIncomming', {e})
     }
   }
 
@@ -121,18 +122,27 @@ export default class SignalServer {
                         socket.to(details.connId).emit(signal.confirmationFailedBusy)
                       }
                     })
+                    .catch(error => {
+                      this.logger.error('receiverConfirm:updateConnectionEntry', {error})
+                    })
                 } else {
                   this.logger.debug('CONNECTION VERIFY FAILED')
                   socket.emit(signal.confirmationFailed) // emit confirmationFailed
                 }
+              })
+              .catch(error => {
+                this.logger.error('receiverConfirm:verifySig', {error})
               })
           } else {
             this.logger.debug('NO CONNECTION DETAILS PROVIDED')
             socket.emit(signal.invalidConnection) // emit InvalidConnection
           }
         })
+        .catch(error => {
+          this.logger.error('receiverConfirm:locateMatchingConnection', {error})
+        })
     } catch (e) {
-      this.logger.error('', {e})
+      this.logger.error('receiverConfirm', {e})
     }
   }
 
@@ -196,6 +206,9 @@ export default class SignalServer {
                     // emit #5 turnToken (listener: both peer)
                     socket.to(connData.connId).emit(signal.turnToken, { data: _results.iceServers })
                     this.logger.debug(`ice servers returned. token.iceServers: ${_results.iceServers}`)
+                  })
+                  .catch(error => {
+                    this.logger.error('ioConnection:createTurnConnection', {error})
                   })
               } catch (e) {
                 this.logger.error('', {e})

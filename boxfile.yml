@@ -6,23 +6,19 @@ run.config:
   engine: nodejs
   engine.config:
     dep_manager: npm
-    runtime: nodejs-8.9
+    runtime: nodejs-9.3
   extra_packages:
     - bash
   build_triggers:
     - package.json
   extra_steps:
-    - cd npm install
-    - cd client && npm run build
-    - cd server && npm install
-data.redis:
-  image: nanobox/redis
-  config:
-    version: 3.0
+    - npm install && npm run build
+data.redis :
+  image : nanobox/redis:3.2
 web.api:
-  ports:
-    - "tcp:3000:3200"
-  routes:
-    - /
+#  ports:
+#    - "tcp:8080:3200"
+#  routes:
+#    - /socket.io
   start:
     - "bash -c 'npm start'"
