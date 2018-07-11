@@ -1,4 +1,3 @@
 import SignalServer from './serverClass'
 
-export {SignalServer}
-
+SignalServer.create()

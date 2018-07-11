@@ -15,17 +15,20 @@ const logger = createLogger('SignalServer')
 export default class SignalServer {
   constructor (options) {
     options = options || {}
+    options.server = options.server || {}
+    options.redis = options.redis || {}
     this.logger = options.logger || logger
     this.clients = options.clients || new Map()
-    this.port = server.port || 8080
-    this.host = server.host || 'localhost'
+    this.port = options.server.port || server.port
+    this.host = options.server.host || server.host
 
     this.server = http.createServer()
 
-    this.redis = new RedisClient(redis)
+    const redisOptions = options.redis.port ? options.redis : redis
+    this.redis = new RedisClient(redisOptions)
 
-    this.io = socketIO(this.server, socket)
-    if (options.redis) this.io.adapter(redisAdapter({ host: redis.host, port: redis.port }))
+    this.io = socketIO(this.server, options.socket || socket)
+    if (options.redis) this.io.adapter(redisAdapter({ host: options.redis.host || redis.host, port: options.redis.port || redis.port }))
     this.server.listen({host: this.host, port: this.port}, () => {
       this.logger.info(this.server.address()) // todo remove dev item
       this.logger.info(`Listening on ${this.port}`)
