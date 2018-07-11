@@ -7,7 +7,6 @@ dotenv.config()
 
 export default class RedisClient {
   constructor (options) {
-    console.log(Redis) // todo remove dev item
     this.connectionErrorCounter = 0
     this.options = options || {}
     this.timeout = this.options.timeout ? this.options.timeout : process.env.CONNECTION_TIMEOUT || 60
@@ -24,7 +23,6 @@ export default class RedisClient {
     })
     this.client.on('error', (err) => {
       if (err.code === 'ECONNREFUSED') {
-        console.log(this.connectionErrorCounter) // todo remove dev item
         if (this.connectionErrorCounter > 100) process.exit(1)
         this.connectionErrorCounter++
       }
