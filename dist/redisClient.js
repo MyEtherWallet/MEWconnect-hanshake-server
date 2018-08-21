@@ -50,10 +50,12 @@ var RedisClient = function () {
     });
     this.client.on('error', function (err) {
       if (err.code === 'ECONNREFUSED') {
-        if (_this.connectionErrorCounter > 100) process.exit(1);
+        if (_this.connectionErrorCounter > 100) {
+          logger.error('TERMINATING PROCESS: CONNECTION TO REDIS SERVER REFUSED MORE THAN 100 TIMES');
+          process.exit(1);
+        }
         _this.connectionErrorCounter++;
       }
-      console.log(err); // todo remove dev item
       logger.error(err);
     });
     this.client.on('connect', function () {
@@ -81,12 +83,10 @@ var RedisClient = function () {
       // const receiver = details.receiver || undefined
       var requireTurn = false;
       var tryTurnSignalCount = 0;
-      console.log(details, socketId); // todo remove dev item
       var hsetArgs = ['initiator', initiator,
       // 'receiver',
       // receiver,
       'message', message, 'initialSigned', initialSigned, 'requireTurn', requireTurn, 'tryTurnSignalCount', tryTurnSignalCount];
-      console.log(connId, JSON.stringify(hsetArgs)); // todo remove dev item
 
       return this.client.hset(connId, hsetArgs).then(function (_result) {
         _this2.client.expire(connId, _this2.timeout).then(function (_expireSet) {
@@ -148,7 +148,7 @@ var RedisClient = function () {
       var _this5 = this;
 
       return this.client.hset(connId, 'requireTurn', true).then(function (_response) {
-        console.log(_response); // todo remove dev item
+        logger.info(_response);
         return _this5.client.hincrby(connId, 'tryTurnSignalCount', 1);
       });
     }

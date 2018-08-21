@@ -40,6 +40,7 @@ export default class SignalServer {
   }
 
   static create (options) {
+    // if no options object is provided then the options set in the config are used
     return new SignalServer(options)
   }
 
@@ -52,7 +53,7 @@ export default class SignalServer {
       return client.tokens
         .create()
     } catch (e) {
-      console.error(e)
+      logger.error(e)
       return null
     }
   }
@@ -94,7 +95,7 @@ export default class SignalServer {
           }
         })
     } catch (e) {
-      this.logger.error('receiverIncomming', {e})
+      this.logger.error('receiverIncoming', {e})
     }
   }
 

@@ -86,7 +86,7 @@ var SignalServer = function () {
         var client = (0, _twilio2.default)(accountSid, authToken);
         return client.tokens.create();
       } catch (e) {
-        console.error(e);
+        logger.error(e);
         return null;
       }
     }
@@ -130,7 +130,7 @@ var SignalServer = function () {
           }
         });
       } catch (e) {
-        this.logger.error('receiverIncomming', { e: e });
+        this.logger.error('receiverIncoming', { e: e });
       }
     }
 
@@ -272,6 +272,7 @@ var SignalServer = function () {
   }], [{
     key: 'create',
     value: function create(options) {
+      // if no options object is provided then the options set in the config are used
       return new SignalServer(options);
     }
   }]);

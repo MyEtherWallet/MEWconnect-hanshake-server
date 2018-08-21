@@ -5,7 +5,7 @@
   "scripts": {
     "build": "rimraf dist/ && babel ./src --out-dir dist/",
     "start": "npm run build && node ./dist/run.js",
-    "example" : "babel-node ./example/example.js",
+    "example": "babel-node ./example/example.js",
     "asFunctionExample": "babel-node ./example/example2.js",
     "prod": "node dist/run.js",
     "dev": "env NODE_ENV=development nodemon --exec npm start",

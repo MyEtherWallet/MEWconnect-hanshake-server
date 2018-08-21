@@ -23,10 +23,12 @@ export default class RedisClient {
     })
     this.client.on('error', (err) => {
       if (err.code === 'ECONNREFUSED') {
-        if (this.connectionErrorCounter > 100) process.exit(1)
+        if (this.connectionErrorCounter > 100) {
+          logger.error('TERMINATING PROCESS: CONNECTION TO REDIS SERVER REFUSED MORE THAN 100 TIMES')
+          process.exit(1)
+        }
         this.connectionErrorCounter++
       }
-      console.log(err) // todo remove dev item
       logger.error(err)
     })
     this.client.on('connect', () => {
@@ -49,7 +51,6 @@ export default class RedisClient {
     // const receiver = details.receiver || undefined
     const requireTurn = false
     const tryTurnSignalCount = 0
-    console.log(details, socketId) // todo remove dev item
     const hsetArgs = [
       'initiator',
       initiator,
@@ -63,7 +64,6 @@ export default class RedisClient {
       requireTurn,
       'tryTurnSignalCount',
       tryTurnSignalCount]
-    console.log( connId, JSON.stringify(hsetArgs)) // todo remove dev item
 
     return this.client.hset(connId, hsetArgs)
       .then((_result) => {
@@ -128,7 +128,7 @@ export default class RedisClient {
       true
     )
       .then((_response) => {
-        console.log(_response) // todo remove dev item
+        logger.info(_response)
         return this.client.hincrby(
           connId,
           'tryTurnSignalCount',
