@@ -48,10 +48,14 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
 _dotenv2.default.config();
 
-var logger = (0, _logging2.default)('SignalServer');
+var errorLogger = (0, _logging2.default)('SignalServer:ERROR');
 
 _debug2.default.log = console.log.bind(console);
-var error = (0, _debug2.default)('signal:error');
+var initiatorLog = (0, _debug2.default)('signal:initiator');
+var receiverLog = (0, _debug2.default)('signal:receiver');
+var turnLog = (0, _debug2.default)('signal:turn');
+var verbose = (0, _debug2.default)('signal:verbose');
+var extraverbose = (0, _debug2.default)('verbose');
 
 var SignalServer = function () {
   function SignalServer(options) {
@@ -63,11 +67,11 @@ var SignalServer = function () {
     options = options || {};
     options.server = options.server || {};
     options.redis = options.redis || {};
-    this.logger = options.logger || logger;
+    this.logger = options.logger || console;
     this.clients = options.clients || new Map();
     this.port = options.server.port || _config.server.port;
     this.host = options.server.host || _config.server.host;
-
+    this.logger.log('thing');
     this.server = _http2.default.createServer();
 
     var redisOptions = options.redis.port ? options.redis : _config.redis;
@@ -76,10 +80,8 @@ var SignalServer = function () {
     this.io = (0, _socket2.default)(this.server, options.socket || _config.socket);
     if (options.redis) this.io.adapter((0, _socket4.default)({ host: options.redis.host || _config.redis.host, port: options.redis.port || _config.redis.port }));
     this.server.listen({ host: this.host, port: this.port }, function () {
-      _this.logger.info(_this.server.address()); // todo remove dev item
-      _this.logger.info('Listening on ' + _this.port);
-      console.log(1, error.enabled);
-      error('test');
+      console.log(_this.server.address()); // todo remove dev item
+      console.log('Listening on ' + _this.port);
     });
 
     if (options.listen) this.io.use(this.listenToConn.bind(this)); // debuging usage (non-functional)
@@ -91,13 +93,13 @@ var SignalServer = function () {
     key: 'createTurnConnection',
     value: function createTurnConnection() {
       try {
-        this.logger.debug('CREATE TURN CONNECTION');
+        turnLog('CREATE TURN CONNECTION');
         var accountSid = process.env.TWILIO;
         var authToken = process.env.TWILLO_TOKEN;
         var client = (0, _twilio2.default)(accountSid, authToken);
         return client.tokens.create();
       } catch (e) {
-        logger.error(e);
+        errorLogger.error(e);
         return null;
       }
     }
@@ -110,13 +112,14 @@ var SignalServer = function () {
     key: 'initiatorIncomming',
     value: function initiatorIncomming(socket, details) {
       try {
-        this.logger.debug('INITIATOR CONNECTION');
+        initiatorLog('INITIATOR CONNECTION');
+        verbose(details);
         if (this.invalidHex(socket.id)) throw new Error('Connection attempted to pass an invalid socket ID');
         this.redis.createConnectionEntry(details, socket.id).then(function () {
           socket.join(details.connId);
         });
       } catch (e) {
-        this.logger.error('initiatorIncomming', { e: e });
+        errorLogger.error('initiatorIncomming', { e: e });
       }
     }
   }, {
@@ -125,23 +128,24 @@ var SignalServer = function () {
       var _this2 = this;
 
       try {
-        this.logger.debug('RECEIVER CONNECTION');
+        initiatorLog('RECEIVER CONNECTION');
         if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
 
         this.redis.locateMatchingConnection(details.connId).then(function (_result) {
           if (_result) {
+            verbose(_result);
             // emit #1 handshake  (listener: receiver peer)
             _this2.redis.getConnectionEntry(details.connId).then(function (_result) {
               socket.emit(_config.signal.handshake, { toSign: _result.message });
             });
           } else {
-            _this2.logger.debug('NO INITIATOR CONNECTION FOUND FOR ' + details.connId);
-            _this2.logger.debug('current client map: ', _this2.clients);
+            receiverLog('NO INITIATOR CONNECTION FOUND FOR ' + details.connId);
+            receiverLog('current client map: ', _this2.clients);
             socket.emit(_config.signal.invalidConnection); // emit InvalidConnection
           }
         });
       } catch (e) {
-        this.logger.error('receiverIncoming', { e: e });
+        errorLogger.error('receiverIncoming', { e: e });
       }
     }
 
@@ -153,16 +157,19 @@ var SignalServer = function () {
       var _this3 = this;
 
       try {
-        this.logger.debug('RECEIVER CONFIRM');
+        receiverLog('RECEIVER CONFIRM');
         if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
         this.redis.locateMatchingConnection(details.connId).then(function (_result) {
+          receiverLog('Located Matching Connection');
+          verbose(_result);
           if (_result) {
             _this3.redis.verifySig(details.connId, details.signed).then(function (_result) {
               if (_result) {
                 socket.join(details.connId);
-                _this3.logger.debug('PAIR CONNECTION VERIFIED');
+                receiverLog('PAIR CONNECTION VERIFIED');
                 _this3.redis.updateConnectionEntry(details.connId, socket.id).then(function (_result) {
                   if (_result) {
+                    receiverLog('Updated connection entry');
                     // emit #2  confirmation (listener: initiator peer)
                     socket.to(details.connId).emit(_config.signal.confirmation, {
                       connId: details.connId,
@@ -170,28 +177,28 @@ var SignalServer = function () {
                     });
                   } else {
                     // emit confirmationFailedBusy
-                    _this3.logger.debug('CONFIRMATION FAILED: BUSY');
+                    receiverLog('CONFIRMATION FAILED: BUSY');
                     socket.to(details.connId).emit(_config.signal.confirmationFailedBusy);
                   }
                 }).catch(function (error) {
-                  _this3.logger.error('receiverConfirm:updateConnectionEntry', { error: error });
+                  errorLogger.error('receiverConfirm:updateConnectionEntry', { error: error });
                 });
               } else {
-                _this3.logger.debug('CONNECTION VERIFY FAILED');
+                receiverLog('CONNECTION VERIFY FAILED');
                 socket.emit(_config.signal.confirmationFailed); // emit confirmationFailed
               }
             }).catch(function (error) {
-              _this3.logger.error('receiverConfirm:verifySig', { error: error });
+              errorLogger.error('receiverConfirm:verifySig', { error: error });
             });
           } else {
-            _this3.logger.debug('NO CONNECTION DETAILS PROVIDED');
+            receiverLog('NO CONNECTION DETAILS PROVIDED');
             socket.emit(_config.signal.invalidConnection); // emit InvalidConnection
           }
         }).catch(function (error) {
-          _this3.logger.error('receiverConfirm:locateMatchingConnection', { error: error });
+          errorLogger.error('receiverConfirm:locateMatchingConnection', { error: error });
         });
       } catch (e) {
-        this.logger.error('receiverConfirm', { e: e });
+        errorLogger.error('receiverConfirm', { e: e });
       }
     }
   }, {
@@ -205,41 +212,45 @@ var SignalServer = function () {
         if (this.invalidHex(token.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
         switch (connector) {
           case _config.stages.initiator:
+            initiatorLog('Initiator stage identifier recieved');
             this.initiatorIncomming(socket, token);
             break;
           case _config.stages.receiver:
+            receiverLog('Receiver stage identifier recieved');
             this.receiverIncomming(socket, token);
             break;
           default:
-            this.logger.error('Invalid Stage Supplied');
+            errorLogger.error('Invalid Stage Supplied');
             return;
         }
 
         socket.on(_config.signal.signature, function (data) {
+          verbose('Recieved: ', _config.signal.signature);
           _this4.receiverConfirm(socket, data);
         });
 
         socket.on(_config.signal.offerSignal, function (offerData) {
-          _this4.logger.debug('OFFER: ', offerData);
+          verbose('OFFER: ', offerData);
           // emit #3 offer (listener: receiver peer)
           _this4.io.to(offerData.connId).emit(_config.signal.offer, { data: offerData.data });
         });
 
         socket.on(_config.signal.answerSignal, function (answerData) {
-          _this4.logger.debug('ANSWER: ', answerData);
+          verbose('ANSWER: ', answerData);
           // emit #4 answer (listener: initiator peer)
           _this4.io.to(answerData.connId).emit(_config.signal.answer, { data: answerData.data });
         });
 
         socket.on(_config.signal.rtcConnected, function (connId) {
           // Clean up client record
+          verbose('Removing connection entry for: ' + connId);
           _this4.redis.removeConnectionEntry(connId);
           socket.leave(connId);
-          _this4.logger.debug('WebRTC CONNECTED');
+          verbose('WebRTC CONNECTED');
         });
 
         socket.on(_config.signal.disconnect, function (reason) {
-          _this4.logger.debug('disconnect reason', reason);
+          verbose('disconnect reason', reason);
           socket.disconnect(true);
         });
 
@@ -251,33 +262,37 @@ var SignalServer = function () {
             if (_result) {
               // Catch error in getting turn credentials
               try {
+                verbose('Update TURN status for ' + conData.connId);
                 _this4.redis.updateTurnStatus(connData.connId);
                 _this4.createTurnConnection().then(function (_results) {
+                  turnLog('Turn Credentials Retrieved');
                   // emit #5 turnToken (listener: both peer)
                   socket.to(connData.connId).emit(_config.signal.turnToken, { data: _results.iceServers });
-                  _this4.logger.debug('ice servers returned. token.iceServers: ' + _results.iceServers);
+                  turnLog('ice servers returned. token.iceServers: ' + _results.iceServers);
                 }).catch(function (error) {
-                  _this4.logger.error('ioConnection:createTurnConnection', { error: error });
+                  errorLogger.error('ioConnection:createTurnConnection', { error: error });
                 });
               } catch (e) {
-                _this4.logger.error('', { e: e });
+                errorLogger.error('', { e: e });
               }
             } else {
-              _this4.logger.debug(' FAILED TO LOCATE MATCHING CONNECTION FOR TURN CONNECTION ATTEMPT');
-              _this4.logger.debug(' connectiono ID. data.connId: ' + connData.connId);
+              errorLogger.error(' FAILED TO LOCATE MATCHING CONNECTION FOR TURN CONNECTION ATTEMPT');
+              turnLog(' connectiono ID. data.connId: ' + connData.connId);
             }
+          }).catch(function (_error) {
+            errorLogger.error('FAILED TO LOCATE MATCHING CONNECTION FOR TURN CONNECTION ATTEMPT \n', _error);
           });
         });
       } catch (e) {
-        this.logger.error('', { e: e });
+        errorLogger.error('', { e: e });
       }
     }
   }, {
     key: 'listenToConn',
     value: function listenToConn(socket, next) {
-      this.logger.debug('-------------------- exchange Listener --------------------');
-      this.logger.debug(socket.handshake);
-      this.logger.debug('------------------------------------------------------------');
+      extraverbose('-------------------- exchange Listener --------------------');
+      extraverbose(socket.handshake);
+      extraverbose('------------------------------------------------------------');
       next();
     }
   }], [{

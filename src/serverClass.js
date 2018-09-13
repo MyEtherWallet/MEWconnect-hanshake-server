@@ -12,7 +12,6 @@ import RedisClient from './redisClient'
 import { redis, server, socket, signal, stages } from './config'
 dotenv.config()
 
-const logger = createLogger('SignalServer')
 const errorLogger = createLogger('SignalServer:ERROR')
 
 debug.log = console.log.bind(console);
@@ -20,16 +19,14 @@ const initiatorLog = debug('signal:initiator');
 const receiverLog = debug('signal:receiver');
 const turnLog = debug('signal:turn');
 const verbose = debug('signal:verbose');
-const signalsLog = debug('signal:signals');
+const extraverbose = debug('verbose');
 
 export default class SignalServer {
   constructor (options) {
-
-    console.log(process.env.DEBUG); // todo remove dev item
     options = options || {}
     options.server = options.server || {}
     options.redis = options.redis || {}
-    this.logger = options.logger || logger
+    this.logger = options.logger || console
     this.clients = options.clients || new Map()
     this.port = options.server.port || server.port
     this.host = options.server.host || server.host
@@ -42,8 +39,8 @@ export default class SignalServer {
     this.io = socketIO(this.server, options.socket || socket)
     if (options.redis) this.io.adapter(redisAdapter({ host: options.redis.host || redis.host, port: options.redis.port || redis.port }))
     this.server.listen({host: this.host, port: this.port}, () => {
-      this.logger.info(this.server.address()) // todo remove dev item
-      this.logger.info(`Listening on ${this.port}`)
+      console.log(this.server.address()) // todo remove dev item
+      console.log(`Listening on ${this.port}`)
     })
 
     if (options.listen) this.io.use(this.listenToConn.bind(this)) // debuging usage (non-functional)
@@ -65,7 +62,7 @@ export default class SignalServer {
       return client.tokens
         .create()
     } catch (e) {
-      logger.error(e)
+      errorLogger.error(e)
       return null
     }
   }
@@ -84,7 +81,7 @@ export default class SignalServer {
           socket.join(details.connId)
         })
     } catch (e) {
-      errorLogger('initiatorIncomming', {e})
+      errorLogger.error('initiatorIncomming', {e})
     }
   }
 
@@ -109,7 +106,7 @@ export default class SignalServer {
           }
         })
     } catch (e) {
-      errorLogger('receiverIncoming', {e})
+      errorLogger.error('receiverIncoming', {e})
     }
   }
 
@@ -144,7 +141,7 @@ export default class SignalServer {
                       }
                     })
                     .catch(error => {
-                      errorLogger('receiverConfirm:updateConnectionEntry', {error})
+                      errorLogger.error('receiverConfirm:updateConnectionEntry', {error})
                     })
                 } else {
                   receiverLog('CONNECTION VERIFY FAILED')
@@ -152,7 +149,7 @@ export default class SignalServer {
                 }
               })
               .catch(error => {
-                errorLogger('receiverConfirm:verifySig', {error})
+                errorLogger.error('receiverConfirm:verifySig', {error})
               })
           } else {
             receiverLog('NO CONNECTION DETAILS PROVIDED')
@@ -160,10 +157,10 @@ export default class SignalServer {
           }
         })
         .catch(error => {
-          errorLogger('receiverConfirm:locateMatchingConnection', {error})
+          errorLogger.error('receiverConfirm:locateMatchingConnection', {error})
         })
     } catch (e) {
-      errorLogger('receiverConfirm', {e})
+      errorLogger.error('receiverConfirm', {e})
     }
   }
 
@@ -182,7 +179,7 @@ export default class SignalServer {
           this.receiverIncomming(socket, token)
           break
         default:
-          errorLogger('Invalid Stage Supplied')
+          errorLogger.error('Invalid Stage Supplied')
           return
       }
 
@@ -235,29 +232,29 @@ export default class SignalServer {
                     turnLog(`ice servers returned. token.iceServers: ${_results.iceServers}`)
                   })
                   .catch(error => {
-                    errorLogger('ioConnection:createTurnConnection', {error})
+                    errorLogger.error('ioConnection:createTurnConnection', {error})
                   })
               } catch (e) {
-                errorLogger('', {e})
+                errorLogger.error('', {e})
               }
             } else {
-              errorLogger(' FAILED TO LOCATE MATCHING CONNECTION FOR TURN CONNECTION ATTEMPT')
+              errorLogger.error(' FAILED TO LOCATE MATCHING CONNECTION FOR TURN CONNECTION ATTEMPT')
               turnLog(` connectiono ID. data.connId: ${connData.connId}`)
             }
           })
           .catch(_error =>{
-            errorLogger('FAILED TO LOCATE MATCHING CONNECTION FOR TURN CONNECTION ATTEMPT \n', _error)
+            errorLogger.error('FAILED TO LOCATE MATCHING CONNECTION FOR TURN CONNECTION ATTEMPT \n', _error)
           })
       })
     } catch (e) {
-      errorLogger('', {e})
+      errorLogger.error('', {e})
     }
   }
 
   listenToConn (socket, next) {
-    this.logger.debug('-------------------- exchange Listener --------------------')
-    this.logger.debug(socket.handshake)
-    this.logger.debug('------------------------------------------------------------')
+    extraverbose('-------------------- exchange Listener --------------------')
+    extraverbose(socket.handshake)
+    extraverbose('------------------------------------------------------------')
     next()
   }
 }
