@@ -5,11 +5,16 @@ Object.defineProperty(exports, "__esModule", {
 });
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }(); // todo look into refactoring to accept plug-in testing data, and/or testing tools
+// const debug = require('debug')('signal');
 
 
 var _dotenv = require('dotenv');
 
 var _dotenv2 = _interopRequireDefault(_dotenv);
+
+var _debug = require('debug');
+
+var _debug2 = _interopRequireDefault(_debug);
 
 var _logging = require('logging');
 
@@ -45,12 +50,16 @@ _dotenv2.default.config();
 
 var logger = (0, _logging2.default)('SignalServer');
 
+_debug2.default.log = console.log.bind(console);
+var error = (0, _debug2.default)('signal:error');
+
 var SignalServer = function () {
   function SignalServer(options) {
     var _this = this;
 
     _classCallCheck(this, SignalServer);
 
+    console.log(process.env.DEBUG); // todo remove dev item
     options = options || {};
     options.server = options.server || {};
     options.redis = options.redis || {};
@@ -69,6 +78,8 @@ var SignalServer = function () {
     this.server.listen({ host: this.host, port: this.port }, function () {
       _this.logger.info(_this.server.address()); // todo remove dev item
       _this.logger.info('Listening on ' + _this.port);
+      console.log(1, error.enabled);
+      error('test');
     });
 
     if (options.listen) this.io.use(this.listenToConn.bind(this)); // debuging usage (non-functional)

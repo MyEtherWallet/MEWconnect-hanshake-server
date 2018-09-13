@@ -1,5 +1,7 @@
 // todo look into refactoring to accept plug-in testing data, and/or testing tools
+// const debug = require('debug')('signal');
 import dotenv from 'dotenv'
+import debug from 'debug'
 import createLogger from 'logging'
 import twilio from 'twilio'
 import http from 'http'
@@ -11,9 +13,19 @@ import { redis, server, socket, signal, stages } from './config'
 dotenv.config()
 
 const logger = createLogger('SignalServer')
+const errorLogger = createLogger('SignalServer:ERROR')
+
+debug.log = console.log.bind(console);
+const initiatorLog = debug('signal:initiator');
+const receiverLog = debug('signal:receiver');
+const turnLog = debug('signal:turn');
+const verbose = debug('signal:verbose');
+const signalsLog = debug('signal:signals');
 
 export default class SignalServer {
   constructor (options) {
+
+    console.log(process.env.DEBUG); // todo remove dev item
     options = options || {}
     options.server = options.server || {}
     options.redis = options.redis || {}
@@ -46,7 +58,7 @@ export default class SignalServer {
 
   createTurnConnection () {
     try {
-      this.logger.debug('CREATE TURN CONNECTION')
+      turnLog('CREATE TURN CONNECTION')
       const accountSid = process.env.TWILIO
       const authToken = process.env.TWILLO_TOKEN
       const client = twilio(accountSid, authToken)
@@ -64,57 +76,62 @@ export default class SignalServer {
 
   initiatorIncomming (socket, details) {
     try {
-      this.logger.debug('INITIATOR CONNECTION')
+      initiatorLog('INITIATOR CONNECTION')
+      verbose(details)
       if (this.invalidHex(socket.id)) throw new Error('Connection attempted to pass an invalid socket ID')
       this.redis.createConnectionEntry(details, socket.id)
         .then(() => {
           socket.join(details.connId)
         })
     } catch (e) {
-      this.logger.error('initiatorIncomming', {e})
+      errorLogger('initiatorIncomming', {e})
     }
   }
 
   receiverIncomming (socket, details) {
     try {
-      this.logger.debug('RECEIVER CONNECTION')
+      initiatorLog('RECEIVER CONNECTION')
       if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID')
 
       this.redis.locateMatchingConnection(details.connId)
         .then(_result => {
           if (_result) {
+            verbose(_result)
             // emit #1 handshake  (listener: receiver peer)
             this.redis.getConnectionEntry(details.connId)
               .then(_result => {
                 socket.emit(signal.handshake, { toSign: _result.message })
               })
           } else {
-            this.logger.debug(`NO INITIATOR CONNECTION FOUND FOR ${details.connId}`)
-            this.logger.debug('current client map: ', this.clients)
+            receiverLog(`NO INITIATOR CONNECTION FOUND FOR ${details.connId}`)
+            receiverLog('current client map: ', this.clients)
             socket.emit(signal.invalidConnection) // emit InvalidConnection
           }
         })
     } catch (e) {
-      this.logger.error('receiverIncoming', {e})
+      errorLogger('receiverIncoming', {e})
     }
   }
 
   // This may now be redundant
   receiverConfirm (socket, details) {
     try {
-      this.logger.debug('RECEIVER CONFIRM')
+      receiverLog('RECEIVER CONFIRM')
       if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID')
       this.redis.locateMatchingConnection(details.connId)
         .then(_result => {
+          receiverLog('Located Matching Connection')
+          verbose(_result)
           if (_result) {
             this.redis.verifySig(details.connId, details.signed)
               .then(_result => {
                 if (_result) {
                   socket.join(details.connId)
-                  this.logger.debug('PAIR CONNECTION VERIFIED')
+                  receiverLog('PAIR CONNECTION VERIFIED')
                   this.redis.updateConnectionEntry(details.connId, socket.id)
                     .then(_result => {
                       if (_result) {
+                        receiverLog('Updated connection entry')
                         // emit #2  confirmation (listener: initiator peer)
                         socket.to(details.connId).emit(signal.confirmation, {
                           connId: details.connId,
@@ -122,31 +139,31 @@ export default class SignalServer {
                         })
                       } else {
                         // emit confirmationFailedBusy
-                        this.logger.debug('CONFIRMATION FAILED: BUSY')
+                        receiverLog('CONFIRMATION FAILED: BUSY')
                         socket.to(details.connId).emit(signal.confirmationFailedBusy)
                       }
                     })
                     .catch(error => {
-                      this.logger.error('receiverConfirm:updateConnectionEntry', {error})
+                      errorLogger('receiverConfirm:updateConnectionEntry', {error})
                     })
                 } else {
-                  this.logger.debug('CONNECTION VERIFY FAILED')
+                  receiverLog('CONNECTION VERIFY FAILED')
                   socket.emit(signal.confirmationFailed) // emit confirmationFailed
                 }
               })
               .catch(error => {
-                this.logger.error('receiverConfirm:verifySig', {error})
+                errorLogger('receiverConfirm:verifySig', {error})
               })
           } else {
-            this.logger.debug('NO CONNECTION DETAILS PROVIDED')
+            receiverLog('NO CONNECTION DETAILS PROVIDED')
             socket.emit(signal.invalidConnection) // emit InvalidConnection
           }
         })
         .catch(error => {
-          this.logger.error('receiverConfirm:locateMatchingConnection', {error})
+          errorLogger('receiverConfirm:locateMatchingConnection', {error})
         })
     } catch (e) {
-      this.logger.error('receiverConfirm', {e})
+      errorLogger('receiverConfirm', {e})
     }
   }
 
@@ -157,41 +174,45 @@ export default class SignalServer {
       if (this.invalidHex(token.connId)) throw new Error('Connection attempted to pass an invalid connection ID')
       switch (connector) {
         case stages.initiator:
+          initiatorLog('Initiator stage identifier recieved')
           this.initiatorIncomming(socket, token)
           break
         case stages.receiver:
+          receiverLog('Receiver stage identifier recieved')
           this.receiverIncomming(socket, token)
           break
         default:
-          this.logger.error('Invalid Stage Supplied')
+          errorLogger('Invalid Stage Supplied')
           return
       }
 
       socket.on(signal.signature, (data) => {
+        verbose('Recieved: ', signal.signature)
         this.receiverConfirm(socket, data)
       })
 
       socket.on(signal.offerSignal, (offerData) => {
-        this.logger.debug('OFFER: ', offerData)
+        verbose('OFFER: ', offerData)
         // emit #3 offer (listener: receiver peer)
         this.io.to(offerData.connId).emit(signal.offer, { data: offerData.data })
       })
 
       socket.on(signal.answerSignal, (answerData) => {
-        this.logger.debug('ANSWER: ', answerData)
+        verbose('ANSWER: ', answerData)
         // emit #4 answer (listener: initiator peer)
         this.io.to(answerData.connId).emit(signal.answer, { data: answerData.data })
       })
 
       socket.on(signal.rtcConnected, (connId) => {
         // Clean up client record
+        verbose(`Removing connection entry for: ${connId}`)
         this.redis.removeConnectionEntry(connId)
         socket.leave(connId)
-        this.logger.debug('WebRTC CONNECTED')
+        verbose('WebRTC CONNECTED')
       })
 
       socket.on(signal.disconnect, (reason) => {
-        this.logger.debug('disconnect reason', reason)
+        verbose('disconnect reason', reason)
         socket.disconnect(true)
       })
 
@@ -204,27 +225,32 @@ export default class SignalServer {
             if (_result) {
               // Catch error in getting turn credentials
               try {
+                verbose(`Update TURN status for ${conData.connId}`)
                 this.redis.updateTurnStatus(connData.connId)
                 this.createTurnConnection()
                   .then((_results) => {
+                    turnLog('Turn Credentials Retrieved')
                     // emit #5 turnToken (listener: both peer)
                     socket.to(connData.connId).emit(signal.turnToken, { data: _results.iceServers })
-                    this.logger.debug(`ice servers returned. token.iceServers: ${_results.iceServers}`)
+                    turnLog(`ice servers returned. token.iceServers: ${_results.iceServers}`)
                   })
                   .catch(error => {
-                    this.logger.error('ioConnection:createTurnConnection', {error})
+                    errorLogger('ioConnection:createTurnConnection', {error})
                   })
               } catch (e) {
-                this.logger.error('', {e})
+                errorLogger('', {e})
               }
             } else {
-              this.logger.debug(' FAILED TO LOCATE MATCHING CONNECTION FOR TURN CONNECTION ATTEMPT')
-              this.logger.debug(` connectiono ID. data.connId: ${connData.connId}`)
+              errorLogger(' FAILED TO LOCATE MATCHING CONNECTION FOR TURN CONNECTION ATTEMPT')
+              turnLog(` connectiono ID. data.connId: ${connData.connId}`)
             }
+          })
+          .catch(_error =>{
+            errorLogger('FAILED TO LOCATE MATCHING CONNECTION FOR TURN CONNECTION ATTEMPT \n', _error)
           })
       })
     } catch (e) {
-      this.logger.error('', {e})
+      errorLogger('', {e})
     }
   }
 
