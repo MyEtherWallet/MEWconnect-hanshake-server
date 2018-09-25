@@ -1,4 +1,3 @@
-
 const signal = {
   attemptingTurn: 'attemptingTurn',
   turnToken: 'turnToken',
@@ -17,23 +16,14 @@ const signal = {
   invalidConnection: 'InvalidConnection',
   confirmationFailedBusy: 'confirmationFailedBusy',
   confirmationFailed: 'confirmationFailed'
-}
+};
 
 const stages = {
   initiator: 'initiator',
   receiver: 'receiver'
-}
-const loggerLevels = {
-  errorLvl: 'error',
-  warnLvl: 'warn',
-  infoLvl: 'info',
-  verboseLvl: 'verbose',
-  debugLvl: 'debug',
-  sillyLvl: 'silly'
-}
+};
 
 export {
   signal,
-  stages,
-  loggerLevels
-}
+  stages
+};

@@ -1,61 +1,60 @@
-import Redis from 'ioredis'
-import dotenv from 'dotenv'
-import createLogger from 'logging'
-const logger = createLogger('Redis')
+import Redis from 'ioredis';
+import dotenv from 'dotenv';
+import createLogger from 'logging';
 
-dotenv.config()
+const logger = createLogger('Redis');
+
+dotenv.config();
 
 export default class RedisClient {
-  constructor (options) {
-    this.connectionErrorCounter = 0
-    this.options = options || {}
-    this.timeout = this.options.timeout ? this.options.timeout : process.env.CONNECTION_TIMEOUT || 60
-    logger.info(`Redis Timeout: ${this.timeout} seconds`)
+  constructor(options) {
+    this.connectionErrorCounter = 0;
+    this.options = options || {};
+    this.timeout = this.options.timeout ? this.options.timeout : process.env.CONNECTION_TIMEOUT || 60;
+    logger.info(`Redis Timeout: ${this.timeout} seconds`);
     this.client = new Redis({
       port: this.options.port || 6379, // Redis port
       host: this.options.host || '127.0.0.1', // Redis host
       family: this.options.family || 4, // 4 (IPv4) or 6 (IPv6)
       db: this.options.db || 0
-    })
+    });
 
     this.client.on('ready', () => {
-      logger.info('REDIS READY ')
-    })
+      logger.info('REDIS READY ');
+    });
     this.client.on('error', (err) => {
       if (err.code === 'ECONNREFUSED') {
+        // Terminate process with error if redis server becomes unavailable for too long
         if (this.connectionErrorCounter > 100) {
-          logger.error('TERMINATING PROCESS: CONNECTION TO REDIS SERVER REFUSED MORE THAN 100 TIMES')
-          process.exit(1)
+          logger.error('TERMINATING PROCESS: CONNECTION TO REDIS SERVER REFUSED MORE THAN 100 TIMES');
+          process.exit(1);
         }
-        this.connectionErrorCounter++
+        this.connectionErrorCounter++;
       }
-      logger.error(err)
-    })
+      logger.error(err);
+    });
     this.client.on('connect', () => {
-      logger.info('Client Connected')
-    })
+      logger.info('Client Connected');
+    });
     this.client.on('end', () => {
-      logger.info('connection closed')
-    })
+      logger.info('connection closed');
+    });
   }
 
-  disconnect () {
-    this.client.disconnect()
+  disconnect() {
+    this.client.disconnect();
   }
 
-  createConnectionEntry (details, socketId) {
-    const connId = details.connId
-    const message = details.message
-    const initialSigned = details.signed
-    const initiator = socketId
-    // const receiver = details.receiver || undefined
-    const requireTurn = false
-    const tryTurnSignalCount = 0
+  createConnectionEntry(details, socketId) {
+    const connId = details.connId;
+    const message = details.message;
+    const initialSigned = details.signed;
+    const initiator = socketId;
+    const requireTurn = false;
+    const tryTurnSignalCount = 0;
     const hsetArgs = [
       'initiator',
       initiator,
-      // 'receiver',
-      // receiver,
       'message',
       message,
       'initialSigned',
@@ -63,45 +62,42 @@ export default class RedisClient {
       'requireTurn',
       requireTurn,
       'tryTurnSignalCount',
-      tryTurnSignalCount]
+      tryTurnSignalCount];
 
     return this.client.hset(connId, hsetArgs)
       .then((_result) => {
         this.client.expire(connId, this.timeout)
-          .then((_expireSet) => {
-            return _result
+          .then(() => {
+            return _result;
           })
           .catch(error => {
-            logger.error('createConnectionEntry', {error})
-          })
-      })
+            logger.error('createConnectionEntry', {error});
+          });
+      });
   }
 
-  verifySig (connId, sig) {
+  verifySig(connId, sig) {
     return this.client.hgetall(connId)
       .then((_result) => {
         if (typeof _result === 'object') {
           if (_result.initialSigned === sig) {
             return this.client.hset(connId, 'verified', true)
-              .then(_result => { return Promise.resolve(true) })
+              .then(() => { return Promise.resolve(true); });
           }
-          return false
+          return false;
         }
-        return false
-      })
+        return false;
+      });
   }
 
-  locateMatchingConnection (connId) {
+  locateMatchingConnection(connId) {
     return this.client.exists(connId)
       .then((_result) => {
-        if (_result === 1) {
-          return true
-        }
-        return false
-      })
+        return _result === 1;
+      });
   }
 
-  updateConnectionEntry (connId, socketId) {
+  updateConnectionEntry(connId, socketId) {
     try {
       return this.client.hexists(connId, 'receiver')
         .then((_result) => {
@@ -111,33 +107,33 @@ export default class RedisClient {
               'receiver',
               socketId
             )
-              .then(_response => { return Promise.resolve(true) })
+              .then(() => { return Promise.resolve(true); });
           }
-          return false
-        })
+          return false;
+        });
     } catch (e) {
-      logger.error('updateConnectionEntry', {e})
-      return false
+      logger.error('updateConnectionEntry', {e});
+      return false;
     }
   }
 
-  updateTurnStatus (connId) {
+  updateTurnStatus(connId) {
     return this.client.hset(
       connId,
       'requireTurn',
       true
     )
       .then((_response) => {
-        logger.info(_response)
+        logger.info(_response);
         return this.client.hincrby(
           connId,
           'tryTurnSignalCount',
           1
-        )
-      })
+        );
+      });
   }
 
-  removeConnectionEntry (connId) {
+  removeConnectionEntry(connId) {
     return this.client.hdel(
       connId,
       'initiator',
@@ -147,47 +143,44 @@ export default class RedisClient {
       'tryTurnSignalCount'
     )
       .then((_result) => {
-        if (_result >= 3) {
-          return true
-        }
-        return false
-      })
+        return _result >= 3;
+      });
   }
 
-  getConnectionEntry (connId) {
-    return this.client.hgetall(connId)
+  getConnectionEntry(connId) {
+    return this.client.hgetall(connId);
   }
 
   // Expose the Underlying Redis Client
-  getClient () {
-    return this.client
+  getClient() {
+    return this.client;
   }
 
-  hset (identifier, requestedBlockNumber, clonedValue) {
+  hset(identifier, requestedBlockNumber, clonedValue) {
     return this.client.hset(
       identifier,
       'blockNumber',
       requestedBlockNumber,
       'result',
       JSON.stringify(clonedValue)
-    )
+    );
   }
 
-  hsetExpires (identifier, requestedBlockNumber, clonedValue, time) {
+  hsetExpires(identifier, requestedBlockNumber, clonedValue, time) {
     return this.client.hset(
       requestedBlockNumber,
       identifier,
       JSON.stringify(clonedValue),
       'EX',
       time
-    )
+    );
   }
 
-  hgetall (identifier) {
-    return this.client.hgetall(identifier)
+  hgetall(identifier) {
+    return this.client.hgetall(identifier);
   }
 
-  hdel (previousHex, key) {
-    return this.client.hdel(previousHex, key)
+  hdel(previousHex, key) {
+    return this.client.hdel(previousHex, key);
   }
 }

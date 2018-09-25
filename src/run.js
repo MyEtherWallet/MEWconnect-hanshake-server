@@ -1,3 +1,3 @@
-import SignalServer from './serverClass'
+import SignalServer from './serverClass';
 
-SignalServer.create()
+SignalServer.create();

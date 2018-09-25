@@ -1,6 +1,6 @@
-'use strict'
+'use strict';
 
-import {SignalServer} from '../src'
+import { SignalServer } from '../src';
 
 let options = {
   server: {
@@ -16,6 +16,6 @@ let options = {
     serveClient: false,
     secure: true
   }
-}
+};
 
-const server = SignalServer.create(options)
+const server = SignalServer.create(options);

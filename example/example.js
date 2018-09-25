@@ -1,4 +1,3 @@
+import { SignalServer } from '../src';
 
-import {SignalServer} from '../src'
-
-const server = SignalServer.create()
+const server = SignalServer.create();
