@@ -3,7 +3,6 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-
 var signal = {
   attemptingTurn: 'attemptingTurn',
   turnToken: 'turnToken',
@@ -28,15 +27,6 @@ var stages = {
   initiator: 'initiator',
   receiver: 'receiver'
 };
-var loggerLevels = {
-  errorLvl: 'error',
-  warnLvl: 'warn',
-  infoLvl: 'info',
-  verboseLvl: 'verbose',
-  debugLvl: 'debug',
-  sillyLvl: 'silly'
-};
 
 exports.signal = signal;
 exports.stages = stages;
-exports.loggerLevels = loggerLevels;

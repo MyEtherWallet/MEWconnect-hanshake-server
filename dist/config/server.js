@@ -19,13 +19,8 @@ var redis = {
 
 var socket = {
   serveClient: false
-  // secure: true
 };
 
 exports.server = server;
 exports.redis = redis;
 exports.socket = socket;
-
-// const server = serverSig.create({
-//   port: 3200, redis: redisOptions, server: serverOptions, socket: socketOptions
-// })

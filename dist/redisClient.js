@@ -50,6 +50,7 @@ var RedisClient = function () {
     });
     this.client.on('error', function (err) {
       if (err.code === 'ECONNREFUSED') {
+        // Terminate process with error if redis server becomes unavailable for too long
         if (_this.connectionErrorCounter > 100) {
           logger.error('TERMINATING PROCESS: CONNECTION TO REDIS SERVER REFUSED MORE THAN 100 TIMES');
           process.exit(1);
@@ -80,16 +81,12 @@ var RedisClient = function () {
       var message = details.message;
       var initialSigned = details.signed;
       var initiator = socketId;
-      // const receiver = details.receiver || undefined
       var requireTurn = false;
       var tryTurnSignalCount = 0;
-      var hsetArgs = ['initiator', initiator,
-      // 'receiver',
-      // receiver,
-      'message', message, 'initialSigned', initialSigned, 'requireTurn', requireTurn, 'tryTurnSignalCount', tryTurnSignalCount];
+      var hsetArgs = ['initiator', initiator, 'message', message, 'initialSigned', initialSigned, 'requireTurn', requireTurn, 'tryTurnSignalCount', tryTurnSignalCount];
 
       return this.client.hset(connId, hsetArgs).then(function (_result) {
-        _this2.client.expire(connId, _this2.timeout).then(function (_expireSet) {
+        _this2.client.expire(connId, _this2.timeout).then(function () {
           return _result;
         }).catch(function (error) {
           logger.error('createConnectionEntry', { error: error });
@@ -104,7 +101,7 @@ var RedisClient = function () {
       return this.client.hgetall(connId).then(function (_result) {
         if ((typeof _result === 'undefined' ? 'undefined' : _typeof(_result)) === 'object') {
           if (_result.initialSigned === sig) {
-            return _this3.client.hset(connId, 'verified', true).then(function (_result) {
+            return _this3.client.hset(connId, 'verified', true).then(function () {
               return Promise.resolve(true);
             });
           }
@@ -117,10 +114,7 @@ var RedisClient = function () {
     key: 'locateMatchingConnection',
     value: function locateMatchingConnection(connId) {
       return this.client.exists(connId).then(function (_result) {
-        if (_result === 1) {
-          return true;
-        }
-        return false;
+        return _result === 1;
       });
     }
   }, {
@@ -131,7 +125,7 @@ var RedisClient = function () {
       try {
         return this.client.hexists(connId, 'receiver').then(function (_result) {
           if (_result === 0) {
-            return _this4.client.hset(connId, 'receiver', socketId).then(function (_response) {
+            return _this4.client.hset(connId, 'receiver', socketId).then(function () {
               return Promise.resolve(true);
             });
           }
@@ -156,10 +150,7 @@ var RedisClient = function () {
     key: 'removeConnectionEntry',
     value: function removeConnectionEntry(connId) {
       return this.client.hdel(connId, 'initiator', 'receiver', 'initialSigned', 'requireTurn', 'tryTurnSignalCount').then(function (_result) {
-        if (_result >= 3) {
-          return true;
-        }
-        return false;
+        return _result >= 3;
       });
     }
   }, {

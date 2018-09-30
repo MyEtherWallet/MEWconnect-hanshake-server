@@ -5,7 +5,6 @@ Object.defineProperty(exports, "__esModule", {
 });
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }(); // todo look into refactoring to accept plug-in testing data, and/or testing tools
-// const debug = require('debug')('signal');
 
 
 var _dotenv = require('dotenv');
@@ -49,6 +48,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 _dotenv2.default.config();
 
 var errorLogger = (0, _logging2.default)('SignalServer:ERROR');
+var infoLogger = (0, _logging2.default)('SignalServer:INFO');
 
 _debug2.default.log = console.log.bind(console);
 var initiatorLog = (0, _debug2.default)('signal:initiator');
@@ -58,15 +58,15 @@ var verbose = (0, _debug2.default)('signal:verbose');
 var extraverbose = (0, _debug2.default)('verbose');
 
 var SignalServer = function () {
-  function SignalServer(options) {
+  function SignalServer() {
     var _this = this;
+
+    var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
 
     _classCallCheck(this, SignalServer);
 
-    options = options || {};
     options.server = options.server || {};
     options.redis = options.redis || {};
-    this.logger = options.logger || console;
     this.clients = options.clients || new Map();
     this.port = options.server.port || _config.server.port;
     this.host = options.server.host || _config.server.host;
@@ -77,13 +77,13 @@ var SignalServer = function () {
     this.redis = new _redisClient2.default(redisOptions);
 
     this.io = (0, _socket2.default)(this.server, options.socket || _config.socket);
-    if (options.redis) this.io.adapter((0, _socket4.default)({ host: options.redis.host || _config.redis.host, port: options.redis.port || _config.redis.port }));
+    if (options.redis) this.io.adapter((0, _socket4.default)({
+      host: options.redis.host || _config.redis.host,
+      port: options.redis.port || _config.redis.port
+    }));
     this.server.listen({ host: this.host, port: this.port }, function () {
-      console.log(_this.server.address()); // todo remove dev item
-      console.log('Listening on ' + _this.port);
+      infoLogger.info('Listening on ' + _this.server.address().address + ':' + _this.port);
     });
-
-    if (options.listen) this.io.use(this.listenToConn.bind(this)); // debuging usage (non-functional)
 
     this.io.on(_config.signal.connection, this.ioConnection.bind(this));
   }
@@ -133,23 +133,18 @@ var SignalServer = function () {
         this.redis.locateMatchingConnection(details.connId).then(function (_result) {
           if (_result) {
             verbose(_result);
-            // emit #1 handshake  (listener: receiver peer)
             _this2.redis.getConnectionEntry(details.connId).then(function (_result) {
               socket.emit(_config.signal.handshake, { toSign: _result.message });
             });
           } else {
             receiverLog('NO INITIATOR CONNECTION FOUND FOR ' + details.connId);
-            // receiverLog('current client map: ', this.clients)
-            socket.emit(_config.signal.invalidConnection); // emit InvalidConnection
+            socket.emit(_config.signal.invalidConnection);
           }
         });
       } catch (e) {
         errorLogger.error('receiverIncoming', { e: e });
       }
     }
-
-    // This may now be redundant
-
   }, {
     key: 'receiverConfirm',
     value: function receiverConfirm(socket, details) {
@@ -169,13 +164,11 @@ var SignalServer = function () {
                 _this3.redis.updateConnectionEntry(details.connId, socket.id).then(function (_result) {
                   if (_result) {
                     receiverLog('Updated connection entry for ' + details.connId);
-                    // emit #2  confirmation (listener: initiator peer)
                     socket.to(details.connId).emit(_config.signal.confirmation, {
                       connId: details.connId,
                       version: details.version
                     });
                   } else {
-                    // emit confirmationFailedBusy
                     receiverLog('CONFIRMATION FAILED: BUSY for connection ID ' + details.connId);
                     socket.to(details.connId).emit(_config.signal.confirmationFailedBusy);
                   }
@@ -184,14 +177,14 @@ var SignalServer = function () {
                 });
               } else {
                 receiverLog('CONNECTION VERIFY FAILED for ' + details.connId);
-                socket.emit(_config.signal.confirmationFailed); // emit confirmationFailed
+                socket.emit(_config.signal.confirmationFailed);
               }
             }).catch(function (error) {
               errorLogger.error('receiverConfirm:verifySig', { error: error });
             });
           } else {
             receiverLog('INVALID CONNECTION DETAILS PROVIDED for ' + details.connId);
-            socket.emit(_config.signal.invalidConnection); // emit InvalidConnection
+            socket.emit(_config.signal.invalidConnection);
           }
         }).catch(function (error) {
           errorLogger.error('receiverConfirm:locateMatchingConnection', { error: error });
@@ -231,23 +224,11 @@ var SignalServer = function () {
 
         socket.on(_config.signal.offerSignal, function (offerData) {
           verbose(_config.signal.offerSignal + ' signal Recieved for ' + offerData.connId + ' ');
-          try {
-            extraverbose('OFFER: ', JSON.stringify(offerData));
-          } catch (e) {
-            console.error(e);
-          }
-          // emit #3 offer (listener: receiver peer)
           _this4.io.to(offerData.connId).emit(_config.signal.offer, { data: offerData.data });
         });
 
         socket.on(_config.signal.answerSignal, function (answerData) {
           verbose(_config.signal.answerSignal + ' signal Recieved for ' + answerData.connId + ' ');
-          try {
-            extraverbose('ANSWER: ', JSON.stringify(answerData));
-          } catch (e) {
-            console.error(e);
-          }
-          // emit #4 answer (listener: initiator peer)
           _this4.io.to(answerData.connId).emit(_config.signal.answer, { data: answerData.data });
         });
 
@@ -260,14 +241,13 @@ var SignalServer = function () {
         });
 
         socket.on(_config.signal.disconnect, function (reason) {
-          verbose('disconnect reason', reason);
+          verbose('disconnect reason: ', reason);
           socket.disconnect(true);
         });
 
         socket.on(_config.signal.tryTurn, function (connData) {
-          // emit #4 answer (listener: initiator peer)
           turnLog(_config.signal.tryTurn + ' signal Recieved for ' + connData.connId + ' ');
-          socket.to(connData.connId).emit(_config.signal.attemptingTurn, { data: null });
+          _this4.io.to(connData.connId).emit(_config.signal.attemptingTurn, { data: null });
 
           _this4.redis.locateMatchingConnection(connData.connId).then(function (_result) {
             if (_result) {
@@ -277,8 +257,7 @@ var SignalServer = function () {
                 _this4.redis.updateTurnStatus(connData.connId);
                 _this4.createTurnConnection().then(function (_results) {
                   turnLog('Turn Credentials Retrieved for ' + connData.connId);
-                  // emit #5 turnToken (listener: both peer)
-                  socket.to(connData.connId).emit(_config.signal.turnToken, { data: _results.iceServers });
+                  _this4.io.to(connData.connId).emit(_config.signal.turnToken, { data: _results.iceServers });
                   turnLog('ice servers returned. token.iceServers: ' + _results.iceServers);
                 }).catch(function (error) {
                   turnLog('Error: createTurnConnectionr ' + connData.connId + ' ');
@@ -299,14 +278,6 @@ var SignalServer = function () {
       } catch (e) {
         errorLogger.error('ioConnection:createTurnConnection', { e: e });
       }
-    }
-  }, {
-    key: 'listenToConn',
-    value: function listenToConn(socket, next) {
-      extraverbose('-------------------- exchange Listener --------------------');
-      extraverbose(socket.handshake);
-      extraverbose('------------------------------------------------------------');
-      next();
     }
   }], [{
     key: 'create',

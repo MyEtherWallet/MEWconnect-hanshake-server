@@ -41,7 +41,7 @@ export default class SignalServer {
       port: options.redis.port || redis.port
     }));
     this.server.listen({host: this.host, port: this.port}, () => {
-      infoLogger(`Listening on ${this.server.address().address}:${this.port}`);
+      infoLogger.info(`Listening on ${this.server.address().address}:${this.port}`);
     });
 
     this.io.on(signal.connection, this.ioConnection.bind(this));
@@ -208,7 +208,7 @@ export default class SignalServer {
 
       socket.on(signal.tryTurn, (connData) => {
         turnLog(`${signal.tryTurn} signal Recieved for ${connData.connId} `);
-        socket.to(connData.connId).emit(signal.attemptingTurn, {data: null});
+        this.io.to(connData.connId).emit(signal.attemptingTurn, {data: null});
 
         this.redis.locateMatchingConnection(connData.connId)
           .then(_result => {
@@ -220,7 +220,7 @@ export default class SignalServer {
                 this.createTurnConnection()
                   .then((_results) => {
                     turnLog(`Turn Credentials Retrieved for ${connData.connId}`);
-                    socket.to(connData.connId).emit(signal.turnToken, {data: _results.iceServers});
+                    this.io.to(connData.connId).emit(signal.turnToken, {data: _results.iceServers});
                     turnLog(`ice servers returned. token.iceServers: ${_results.iceServers}`);
                   })
                   .catch(error => {
