@@ -56,10 +56,11 @@ export default class SignalServer {
     try {
       turnLog('CREATE TURN CONNECTION');
       const accountSid = process.env.TWILIO;
-      const authToken = process.env.TWILLO_TOKEN;
+      const authToken = process.env.TWILIO_TOKEN;
+      const ttl = process.env.TWILIO_TTL;
       const client = twilio(accountSid, authToken);
       return client.tokens
-        .create();
+        .create({ttl: ttl});
     } catch (e) {
       errorLogger.error(e);
       return null;
@@ -190,7 +191,7 @@ export default class SignalServer {
 
       socket.on(signal.answerSignal, (answerData) => {
         verbose(`${signal.answerSignal} signal Recieved for ${answerData.connId} `);
-        this.io.to(answerData.connId).emit(signal.answer, {data: answerData.data});
+        this.io.to(answerData.connId).emit(signal.answer, {data: answerData.data, options: answerData.options});
       });
 
       socket.on(signal.rtcConnected, (connId) => {

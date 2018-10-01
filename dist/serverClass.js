@@ -94,9 +94,10 @@ var SignalServer = function () {
       try {
         turnLog('CREATE TURN CONNECTION');
         var accountSid = process.env.TWILIO;
-        var authToken = process.env.TWILLO_TOKEN;
+        var authToken = process.env.TWILIO_TOKEN;
+        var ttl = process.env.TWILIO_TTL;
         var client = (0, _twilio2.default)(accountSid, authToken);
-        return client.tokens.create();
+        return client.tokens.create({ ttl: ttl });
       } catch (e) {
         errorLogger.error(e);
         return null;
@@ -229,7 +230,7 @@ var SignalServer = function () {
 
         socket.on(_config.signal.answerSignal, function (answerData) {
           verbose(_config.signal.answerSignal + ' signal Recieved for ' + answerData.connId + ' ');
-          _this4.io.to(answerData.connId).emit(_config.signal.answer, { data: answerData.data });
+          _this4.io.to(answerData.connId).emit(_config.signal.answer, { data: answerData.data, options: answerData.options });
         });
 
         socket.on(_config.signal.rtcConnected, function (connId) {
