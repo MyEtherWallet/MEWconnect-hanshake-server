@@ -7,6 +7,7 @@ import http from 'http';
 import socketIO from 'socket.io';
 import redisAdapter from 'socket.io-redis';
 
+import validator from './validators';
 import RedisClient from './redisClient';
 import { redis, server, socket, signal, stages } from './config';
 
@@ -50,6 +51,16 @@ export default class SignalServer {
   static create(options) {
     // if no options object is provided then the options set in the config are used
     return new SignalServer(options);
+  }
+
+  validate(message, next) {
+    validator(message)
+      .then(result => {
+        if (result) {
+          return next();
+        }
+        return next(new Error('invalid signal or paramaters'));
+      });
   }
 
   createTurnConnection() {
@@ -161,6 +172,7 @@ export default class SignalServer {
 
   ioConnection(socket) {
     try {
+      socket.use(this.validate.bind(this));
       const token = socket.handshake.query;
       const connector = token.stage || false;
       if (this.invalidHex(token.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
@@ -191,7 +203,10 @@ export default class SignalServer {
 
       socket.on(signal.answerSignal, (answerData) => {
         verbose(`${signal.answerSignal} signal Recieved for ${answerData.connId} `);
-        this.io.to(answerData.connId).emit(signal.answer, {data: answerData.data, options: answerData.options});
+        this.io.to(answerData.connId).emit(signal.answer, {
+          data: answerData.data,
+          options: answerData.options
+        });
       });
 
       socket.on(signal.rtcConnected, (connId) => {

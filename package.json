@@ -24,6 +24,7 @@
     "socket.io": "^2.0.4",
     "socket.io-redis": "^5.2.0",
     "twilio": "^3.17.1",
+    "validate": "^4.5.1",
     "winston": "^2.4.2"
   },
   "devDependencies": {
