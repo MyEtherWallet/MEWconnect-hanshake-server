@@ -34,37 +34,40 @@ var RedisClient = function () {
 
     _classCallCheck(this, RedisClient);
 
-    this.connectionErrorCounter = 0;
-    this.options = options || {};
-    this.timeout = this.options.timeout ? this.options.timeout : process.env.CONNECTION_TIMEOUT || 60;
-    logger.info('Redis Timeout: ' + this.timeout + ' seconds');
-    this.client = new _ioredis2.default({
-      port: this.options.port || 6379, // Redis port
-      host: this.options.host || '127.0.0.1', // Redis host
-      family: this.options.family || 4, // 4 (IPv4) or 6 (IPv6)
-      db: this.options.db || 0
-    });
+    return async function () {
+      _this.connectionErrorCounter = 0;
+      _this.options = options || {};
+      _this.timeout = _this.options.timeout ? _this.options.timeout : process.env.CONNECTION_TIMEOUT || 60;
+      logger.info('Redis Timeout: ' + _this.timeout + ' seconds');
+      _this.client = await new _ioredis2.default({
+        port: _this.options.port || 6379, // Redis port
+        host: _this.options.host || '127.0.0.1', // Redis host
+        family: _this.options.family || 4, // 4 (IPv4) or 6 (IPv6)
+        db: _this.options.db || 0
+      });
 
-    this.client.on('ready', function () {
-      logger.info('REDIS READY ');
-    });
-    this.client.on('error', function (err) {
-      if (err.code === 'ECONNREFUSED') {
-        // Terminate process with error if redis server becomes unavailable for too long
-        if (_this.connectionErrorCounter > 100) {
-          logger.error('TERMINATING PROCESS: CONNECTION TO REDIS SERVER REFUSED MORE THAN 100 TIMES');
-          process.exit(1);
+      _this.client.on('ready', function () {
+        logger.info('REDIS READY ');
+      });
+      _this.client.on('error', function (err) {
+        if (err.code === 'ECONNREFUSED') {
+          // Terminate process with error if redis server becomes unavailable for too long
+          if (_this.connectionErrorCounter > 100) {
+            logger.error('TERMINATING PROCESS: CONNECTION TO REDIS SERVER REFUSED MORE THAN 100 TIMES');
+            process.exit(1);
+          }
+          _this.connectionErrorCounter++;
         }
-        _this.connectionErrorCounter++;
-      }
-      logger.error(err);
-    });
-    this.client.on('connect', function () {
-      logger.info('Client Connected');
-    });
-    this.client.on('end', function () {
-      logger.info('connection closed');
-    });
+        logger.error(err);
+      });
+      _this.client.on('connect', function () {
+        logger.info('Client Connected');
+      });
+      _this.client.on('end', function () {
+        logger.info('connection closed');
+      });
+      return _this;
+    }();
   }
 
   _createClass(RedisClient, [{

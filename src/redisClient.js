@@ -8,37 +8,40 @@ dotenv.config();
 
 export default class RedisClient {
   constructor(options) {
-    this.connectionErrorCounter = 0;
-    this.options = options || {};
-    this.timeout = this.options.timeout ? this.options.timeout : process.env.CONNECTION_TIMEOUT || 60;
-    logger.info(`Redis Timeout: ${this.timeout} seconds`);
-    this.client = new Redis({
-      port: this.options.port || 6379, // Redis port
-      host: this.options.host || '127.0.0.1', // Redis host
-      family: this.options.family || 4, // 4 (IPv4) or 6 (IPv6)
-      db: this.options.db || 0
-    });
+    return (async () => {
+      this.connectionErrorCounter = 0;
+      this.options = options || {};
+      this.timeout = this.options.timeout ? this.options.timeout : process.env.CONNECTION_TIMEOUT || 60;
+      logger.info(`Redis Timeout: ${this.timeout} seconds`);
+      this.client = await new Redis({
+        port: this.options.port || 6379, // Redis port
+        host: this.options.host || '127.0.0.1', // Redis host
+        family: this.options.family || 4, // 4 (IPv4) or 6 (IPv6)
+        db: this.options.db || 0
+      });
 
-    this.client.on('ready', () => {
-      logger.info('REDIS READY ');
-    });
-    this.client.on('error', (err) => {
-      if (err.code === 'ECONNREFUSED') {
-        // Terminate process with error if redis server becomes unavailable for too long
-        if (this.connectionErrorCounter > 100) {
-          logger.error('TERMINATING PROCESS: CONNECTION TO REDIS SERVER REFUSED MORE THAN 100 TIMES');
-          process.exit(1);
+      this.client.on('ready', () => {
+        logger.info('REDIS READY ');
+      });
+      this.client.on('error', (err) => {
+        if (err.code === 'ECONNREFUSED') {
+          // Terminate process with error if redis server becomes unavailable for too long
+          if (this.connectionErrorCounter > 100) {
+            logger.error('TERMINATING PROCESS: CONNECTION TO REDIS SERVER REFUSED MORE THAN 100 TIMES');
+            process.exit(1);
+          }
+          this.connectionErrorCounter++;
         }
-        this.connectionErrorCounter++;
-      }
-      logger.error(err);
-    });
-    this.client.on('connect', () => {
-      logger.info('Client Connected');
-    });
-    this.client.on('end', () => {
-      logger.info('connection closed');
-    });
+        logger.error(err);
+      });
+      this.client.on('connect', () => {
+        logger.info('Client Connected');
+      });
+      this.client.on('end', () => {
+        logger.info('connection closed');
+      });
+      return this
+    })()
   }
 
   disconnect() {

@@ -1,10 +1,15 @@
 'use strict';
 
+// Import //
 // todo look into refactoring to accept plug-in testing data, and/or testing tools
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+
+var _logging = require('logging');
+
+var _logging2 = _interopRequireDefault(_logging);
 
 var _debug = require('debug');
 
@@ -18,9 +23,7 @@ var _http = require('http');
 
 var _http2 = _interopRequireDefault(_http);
 
-var _logging = require('logging');
-
-var _logging2 = _interopRequireDefault(_logging);
+var _util = require('util');
 
 var _socket = require('socket.io-redis');
 
@@ -46,13 +49,69 @@ var _config = require('@/config');
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-exports.default = function () {
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-  var init = function init() {
-    console.log('test');
-  };
+// Lib //
 
-  return {
-    init: init
-  };
-}();
+
+// Loggers //
+var errorLogger = (0, _logging2.default)('SignalServer:ERROR');
+var infoLogger = (0, _logging2.default)('SignalServer:INFO');
+
+var SignalServer =
+/**
+ * Represents the "Signal Server" for handling MEWConnect Requests
+ * @constructor
+ * @param {Object} options - Configuration options for the Signal Server
+ *                         - These are typically obtained through config files in @/config
+ * @param {Map} options.clients - Map object of connected clients
+ * @param {Object} options.server - Configuration pertaining to the HTTP server
+ * @param {Object} options.server.host - Host address of the HTTP server
+ * @param {Object} options.server.port - Port that the HTTP server will run on
+ * @param {Object} options.socket - Configuration pertaining to the socket.io server
+ * @param {Object} options.redis - Configuration pertaining to the Redis client
+ * @param {Object} options.redis.host - Host address of the Redis client
+ * @param {Object} options.redis.port - Port that the Redis host runs on
+ */
+function SignalServer() {
+  var _this = this;
+
+  var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+
+  _classCallCheck(this, SignalServer);
+
+  return async function () {
+    // Options will either be set in constructor or default to those defined in @/config //
+    options.server = options.server || _config.serverConfig;
+    options.socket = options.socket || _config.socketConfig;
+    options.redis = options.redis || _config.redisConfig;
+
+    // Create Map of clients //
+    _this.clients = options.clients || new Map();
+
+    // Set host/port to those define in options or @/config and create HTTP server //
+    _this.port = options.server.port;
+    _this.host = options.server.host;
+    _this.server = await _http2.default.createServer();
+
+    // Create Redis client with configuration defined in options or @/config //
+    _this.redis = await new _redisClient2.default(options.redis);
+
+    // Create socket.io s
+    _this.io = (0, _socket4.default)(_this.server, options.socket);
+    _this.io.adapter((0, _socket2.default)({
+      host: options.redis.host,
+      port: options.redis.port
+    }));
+
+    // Promisify server.listen for async/await and listen on configured options //
+    var serverPromise = (0, _util.promisify)(_this.server.listen).bind(_this.server);
+    await serverPromise({ host: _this.host, port: _this.port });
+    infoLogger.info('Listening on ' + _this.server.address().address + ':' + _this.port);
+
+    // this.io.on(signal.connection, this.ioConnection.bind(this))
+    return _this;
+  }();
+};
+
+exports.default = SignalServer;

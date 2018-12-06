@@ -1,17 +1,25 @@
 'use strict'
 
+// Import //
 // todo look into refactoring to accept plug-in testing data, and/or testing tools
+import createLogger from 'logging'
 import debug from 'debug'
 import dotenv from 'dotenv'
 import http from 'http'
 import logger from 'logging'
+import { promisify } from 'util'
 import redisAdapter from 'socket.io-redis'
 import socketIO from 'socket.io'
 import twilio from 'twilio'
 
+// Lib //
 import validator from '@/validators'
 import RedisClient from '@/redisClient'
 import { redisConfig, serverConfig, socketConfig, signal, stages } from '@/config'
+
+// Loggers //
+const errorLogger = createLogger('SignalServer:ERROR')
+const infoLogger = createLogger('SignalServer:INFO')
 
 export default class SignalServer {
   /**
@@ -23,40 +31,43 @@ export default class SignalServer {
    * @param {Object} options.server - Configuration pertaining to the HTTP server
    * @param {Object} options.server.host - Host address of the HTTP server
    * @param {Object} options.server.port - Port that the HTTP server will run on
+   * @param {Object} options.socket - Configuration pertaining to the socket.io server
    * @param {Object} options.redis - Configuration pertaining to the Redis client
    * @param {Object} options.redis.host - Host address of the Redis client
    * @param {Object} options.redis.port - Port that the Redis host runs on
    */
   constructor (options = {}) {
-    // Options will either be set in constructor or default to those defined in @/config //
-    options.server = options.server || serverConfig
-    options.redis = options.redis || redisConfig
+    return (async () => {
+      // Options will either be set in constructor or default to those defined in @/config //
+      options.server = options.server || serverConfig
+      options.socket = options.socket || socketConfig
+      options.redis = options.redis || redisConfig
 
-    // Set host/port to those define in options or @/config and create HTTP server //
-    this.port = options.server.port
-    this.host = options.server.host
-    this.server = http.createServer()
+      // Create Map of clients //
+      this.clients = options.clients || new Map()
 
-    // Create Map of clients //
-    this.clients = options.clients || new Map()
+      // Set host/port to those define in options or @/config and create HTTP server //
+      this.port = options.server.port
+      this.host = options.server.host
+      this.server = await http.createServer()
 
-    // Create Redis client with configuration defined in options or @/config //
-    this.redis = new RedisClient(options.redis)
+      // Create Redis client with configuration defined in options or @/config //
+      this.redis = await new RedisClient(options.redis)
 
-    this.io = socketIO(this.server, options.socket || socket)
-    if (options.redis) this.io.adapter(redisAdapter({
-      host: options.redis.host || redis.host,
-      port: options.redis.port || redis.port
-    }))
-    this.server.listen({host: this.host, port: this.port}, () => {
+      // Create socket.io s
+      this.io = socketIO(this.server, options.socket)
+      this.io.adapter(redisAdapter({
+        host: options.redis.host,
+        port: options.redis.port
+      }))
+
+      // Promisify server.listen for async/await and listen on configured options //
+      let serverPromise = promisify(this.server.listen).bind(this.server)
+      await serverPromise({ host: this.host, port: this.port })
       infoLogger.info(`Listening on ${this.server.address().address}:${this.port}`)
-    })
 
-    this.io.on(signal.connection, this.ioConnection.bind(this))
-  }
-
-  static create(options) {
-    // if no options object is provided then the options set in the config are used
-    return new SignalServer(options)
+      // this.io.on(signal.connection, this.ioConnection.bind(this))
+      return this
+    })()
   }
 }
