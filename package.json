@@ -19,6 +19,7 @@
     "ethereumjs-util": "^5.1.5",
     "ioredis": "^3.2.2",
     "logging": "^3.2.0",
+    "module-alias": "^2.1.0",
     "morgan": "~1.9.0",
     "secp256k1": "^3.5.0",
     "socket.io": "^2.0.4",
@@ -40,5 +41,9 @@
     "eslint-plugin-promise": "^3.8.0",
     "eslint-plugin-standard": "^3.1.0",
     "mocha": "^5.2.0"
+  },
+  "_moduleAliases": {
+    "@": "dist",
+    "@config": "dist/config"
   }
 }

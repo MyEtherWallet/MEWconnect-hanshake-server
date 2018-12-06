@@ -1,3 +1,10 @@
-import SignalServer from './serverClass';
+// import SignalServer from './serverClass';
 
-SignalServer.create();
+// SignalServer.create();
+//
+// See: https://www.npmjs.com/package/module-alias //
+import 'module-alias/register'
+
+import Server from '@/server'
+
+Server.init()

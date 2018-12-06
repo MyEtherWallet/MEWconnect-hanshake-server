@@ -1,3 +1,5 @@
+'use strict'
+
 const signal = {
   attemptingTurn: 'attemptingTurn',
   turnToken: 'turnToken',
@@ -16,14 +18,14 @@ const signal = {
   invalidConnection: 'InvalidConnection',
   confirmationFailedBusy: 'confirmationFailedBusy',
   confirmationFailed: 'confirmationFailed'
-};
+}
 
 const stages = {
   initiator: 'initiator',
   receiver: 'receiver'
-};
+}
 
 export {
   signal,
   stages
-};
+}

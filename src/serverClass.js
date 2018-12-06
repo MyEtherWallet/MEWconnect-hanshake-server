@@ -1,3 +1,8 @@
+'use strict'
+
+// See: https://www.npmjs.com/package/module-alias //
+import 'module-alias/register'
+
 // todo look into refactoring to accept plug-in testing data, and/or testing tools
 import dotenv from 'dotenv';
 import debug from 'debug';

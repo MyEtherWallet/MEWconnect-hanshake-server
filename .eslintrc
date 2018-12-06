@@ -2,7 +2,8 @@
   "rules":{
     "class-methods-use-this": "off",
     "no-underscore-dangle": "off",
-      "prefer-destructuring": ["error", {"object": false, "array": false}]
+    "prefer-destructuring": ["error", {"object": false, "array": false}],
+    "semi": 0,
   },
   "extends": "standard",
   "env":{

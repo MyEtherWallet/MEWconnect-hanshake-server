@@ -1,9 +1,16 @@
 'use strict';
 
-var _serverClass = require('./serverClass');
+require('module-alias/register');
 
-var _serverClass2 = _interopRequireDefault(_serverClass);
+var _server = require('@/server');
+
+var _server2 = _interopRequireDefault(_server);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-_serverClass2.default.create();
+// import SignalServer from './serverClass';
+
+// SignalServer.create();
+//
+// See: https://www.npmjs.com/package/module-alias //
+_server2.default.init();
