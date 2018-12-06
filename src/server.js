@@ -54,19 +54,21 @@ export default class SignalServer {
       // Create Redis client with configuration defined in options or @/config //
       this.redis = await new RedisClient(options.redis)
 
-      // Create socket.io s
-      this.io = socketIO(this.server, options.socket)
-      this.io.adapter(redisAdapter({
-        host: options.redis.host,
-        port: options.redis.port
-      }))
-
       // Promisify server.listen for async/await and listen on configured options //
       let serverPromise = promisify(this.server.listen).bind(this.server)
       await serverPromise({ host: this.host, port: this.port })
       infoLogger.info(`Listening on ${this.server.address().address}:${this.port}`)
 
+      // Create socket.io connection using socket.io-redis //
+      this.io = await socketIO(this.server, options.socket)
+      this.io.adapter(redisAdapter({
+        host: options.redis.host,
+        port: options.redis.port
+      }))
+
       // this.io.on(signal.connection, this.ioConnection.bind(this))
+
+      // Return SignalServer after successful asynchronous instantiation //
       return this
     })()
   }

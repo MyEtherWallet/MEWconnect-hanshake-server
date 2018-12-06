@@ -97,19 +97,21 @@ function SignalServer() {
     // Create Redis client with configuration defined in options or @/config //
     _this.redis = await new _redisClient2.default(options.redis);
 
-    // Create socket.io s
-    _this.io = (0, _socket4.default)(_this.server, options.socket);
-    _this.io.adapter((0, _socket2.default)({
-      host: options.redis.host,
-      port: options.redis.port
-    }));
-
     // Promisify server.listen for async/await and listen on configured options //
     var serverPromise = (0, _util.promisify)(_this.server.listen).bind(_this.server);
     await serverPromise({ host: _this.host, port: _this.port });
     infoLogger.info('Listening on ' + _this.server.address().address + ':' + _this.port);
 
+    // Create socket.io connection using socket.io-redis //
+    _this.io = await (0, _socket4.default)(_this.server, options.socket);
+    _this.io.adapter((0, _socket2.default)({
+      host: options.redis.host,
+      port: options.redis.port
+    }));
+
     // this.io.on(signal.connection, this.ioConnection.bind(this))
+
+    // Return SignalServer after successful asynchronous instantiation //
     return _this;
   }();
 };
