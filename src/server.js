@@ -17,9 +17,17 @@ import validator from '@/validators'
 import RedisClient from '@/redisClient'
 import { redisConfig, serverConfig, socketConfig, signal, stages } from '@/config'
 
-// Loggers //
+// SignalServer Loggers //
 const errorLogger = createLogger('SignalServer:ERROR')
 const infoLogger = createLogger('SignalServer:INFO')
+
+// Signal Loggers //
+debug.log = console.log.bind(console)
+const initiatorLog = debug('signal:initiator')
+const receiverLog = debug('signal:receiver')
+const turnLog = debug('signal:turn')
+const verbose = debug('signal:verbose')
+const extraverbose = debug('verbose')
 
 export default class SignalServer {
   /**
@@ -65,11 +73,92 @@ export default class SignalServer {
         host: options.redis.host,
         port: options.redis.port
       }))
-
-      // this.io.on(signal.connection, this.ioConnection.bind(this))
+      this.io.on(signal.connection, this.ioConnection.bind(this))
 
       // Return SignalServer after successful asynchronous instantiation //
       return this
     })()
+  }
+
+  async validate (message, next) {
+    try {
+      await validator(message)
+      return next()
+    } catch (e) {
+      return next(new Error('invalid signal or parameters'))
+    }
+  }
+
+  ioConnection (socket) {
+    try {
+      // Use class function validate() middleware //
+      socket.use(this.validate.bind(this))
+
+      // Get socket handshake query token //
+      const token = socket.handshake.query
+      const stage = token.stage || false
+      const connId = token.connId || false
+
+      // ERROR: invalid connection id //
+      if (this.isInvalidHex(connId)) throw new Error('Connection attempted to pass an invalid connection ID')
+
+      // Handle connection based on stage provided by token //
+      switch (stage) {
+        case stages.initiator:
+          initiatorLog('Initiator stage identifier recieved')
+          this.initiatorIncomming(socket, token)
+          break
+        case stages.receiver:
+          receiverLog('Receiver stage identifier recieved')
+          this.receiverIncomming(socket, token)
+          break
+        default:
+          errorLogger.error('Invalid Stage Supplied')
+          return false
+      }
+
+      // Handle signal "signature" event //
+      socket.on(signal.signature, data => {
+        verbose(`${signal.signature} signal Recieved for ${data.connId} `)
+        extraverbose('Recieved: ', signal.signature)
+        this.receiverConfirm(socket, data)
+      })
+
+      // Handle signal "offerSignal" event //
+      socket.on(signal.offerSignal, offerData => {
+        verbose(`${signal.offerSignal} signal Recieved for ${offerData.connId} `)
+        this.io.to(offerData.connId).emit(signal.offer, {data: offerData.data})
+      })
+
+      // Handle signal "answerSignal" event //
+      socket.on(signal.answerSignal, answerData => {
+        verbose(`${signal.answerSignal} signal Recieved for ${answerData.connId} `)
+        this.io.to(answerData.connId).emit(signal.answer, {
+          data: answerData.data,
+          options: answerData.options
+        })
+      })
+
+      // Handle signal "rtcConnected" event //
+      socket.on(signal.rtcConnected, connId => {
+        // Clean up client record
+        verbose(`Removing connection entry for: ${connId}`)
+        this.redis.removeConnectionEntry(connId)
+        socket.leave(connId)
+        verbose('WebRTC CONNECTED', connId)
+      })
+
+      // Handle signal "disconnect" event //
+      socket.on(signal.disconnect, reason => {
+        verbose('disconnect reason: ', reason)
+        socket.disconnect(true)
+      })
+    } catch (e) {
+      errorLogger.error('ioConnection:createTurnConnection', {e})
+    }
+  }
+
+  isInvalidHex (hex) {
+    return !(/[0-9A-Fa-f].*/.test(hex));
   }
 }

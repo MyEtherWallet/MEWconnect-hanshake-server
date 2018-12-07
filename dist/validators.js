@@ -160,7 +160,7 @@ function isValid(message) {
     } else if (message[0] === tryTurn) {
       errors = tryTurnValidator.validate(message[1]);
     } else {
-      resolve(false);
+      reject();
     }
 
     if (message[1].options !== undefined && message[1].options !== null) {
@@ -171,9 +171,9 @@ function isValid(message) {
     }
 
     if (errors.length > 0) {
-      resolve(false);
+      reject();
     } else {
-      resolve(true);
+      resolve();
     }
   });
 }
