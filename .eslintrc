@@ -10,5 +10,10 @@
     "node": true,
     "mocha": true,
     "es6": true
+  },
+  "globals": {
+    "describe": false,
+    "it": false,
+    "expect": false
   }
 }

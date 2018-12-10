@@ -10,3 +10,5 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 // See: https://www.npmjs.com/package/module-alias //
 var server = new _server2.default();
+
+server.init();
