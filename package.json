@@ -10,7 +10,7 @@
     "asFunctionExample": "babel-node ./example/example2.js",
     "prod": "node dist/run.js",
     "dev": "env NODE_ENV=development nodemon --exec npm start",
-    "test": "npm run build && NODE_ENV=test jest --detectOpenHandles --forceExit --verbose",
+    "test": "npm run build && NODE_ENV=test jest --detectOpenHandles --forceExit --runInBand --verbose",
     "test:unit": "npm test -- tests/unit",
     "test:integration": "npm test -- tests/integration"
   },
