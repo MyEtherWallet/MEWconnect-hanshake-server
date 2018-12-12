@@ -17,13 +17,10 @@
   "dependencies": {
     "debug": "~2.6.9",
     "dotenv": "^5.0.1",
-    "eccrypto": "^1.0.3",
-    "ethereumjs-util": "^5.1.5",
     "ioredis": "^3.2.2",
     "logging": "^3.2.0",
     "module-alias": "^2.1.0",
-    "morgan": "~1.9.0",
-    "secp256k1": "^3.5.0",
+    "morgan": "^1.9.1",
     "socket.io": "^2.0.4",
     "socket.io-redis": "^5.2.0",
     "twilio": "^3.17.1",
@@ -37,6 +34,8 @@
     "babel-plugin-transform-object-rest-spread": "^6.26.0",
     "babel-preset-es2015": "^6.24.1",
     "chai": "^4.1.2",
+    "crypto": "^1.0.1",
+    "eccrypto": "^1.1.0",
     "eslint": "^4.19.1",
     "eslint-config-standard": "^11.0.0",
     "eslint-plugin-import": "^2.13.0",
@@ -44,9 +43,11 @@
     "eslint-plugin-node": "^6.0.1",
     "eslint-plugin-promise": "^3.8.0",
     "eslint-plugin-standard": "^3.1.0",
+    "ethereumjs-util": "^5.2.0",
     "jest": "^23.6.0",
     "mocha": "^5.2.0",
-    "regenerator-runtime": "^0.13.1"
+    "regenerator-runtime": "^0.13.1",
+    "secp256k1": "^3.5.2"
   },
   "_moduleAliases": {
     "@": "dist",
@@ -60,6 +61,7 @@
       "@clients(.*)$": "<rootDir>/dist/clients$1",
       "@config(.*)$": "<rootDir>/dist/config$1",
       "@helpers(.*)$": "<rootDir>/dist/helpers$1",
+      "@utils(.*)$": "<rootDir>/test/utils$1",
       "@/(.*)$": "<rootDir>dist$1"
     }
   }

@@ -6,7 +6,8 @@ import SocketIOClient from 'socket.io-client'
 import Redis from 'ioredis'
 
 // Libs //
-import { redisConfig, serverConfig, signal, stages } from '@config'
+import CryptoUtils from '@utils/crypto-utils'
+import { redisConfig, serverConfig, signals, stages } from '@config'
 import SignalServer from '@clients/signal-server'
 import RedisClient from '@clients/redis-client'
 
@@ -44,28 +45,52 @@ describe('Signal Server', () => {
    * Good reference: https://medium.com/@tozwierz/testing-socket-io-with-jest-on-backend-node-js-f71f7ec7010f
    */
   describe('io', () => {
-    // Reused variables //
+    // IO "member" variables //
     let socket
     let serverAddress
+    let publicKey
+    let privateKey
+    let connId
+    let signed
+    let socketManager
+
+    /**
+     * Test initialization processes
+     */
 
     // Initialize variables used in all tests //
     beforeAll(async (done) => {
-      serverAddress = signalServer.server.address()
-      socket = await SocketIOClient.connect(`http://${serverAddress.address}:${serverAddress.port}`)
+      // SigalServer details //
+      let address = signalServer.server.address()
+      serverAddress = `http://${address.address}:${address.port}`
+
+      // Connection Info //
+      let keys = CryptoUtils.generateKeys()
+      publicKey = keys.publicKey
+      privateKey = keys.privateKey
+      connId = CryptoUtils.generateConnId(publicKey)
+      signed = CryptoUtils.signMessage(privateKey, privateKey)
       done()
     })
 
     // Connect to socketIO before each test //
     beforeEach(async (done) => {
-      socket = await SocketIOClient.connect(`http://${serverAddress.address}:${serverAddress.port}`, {
+      let message = CryptoUtils.generateRandomMessage()
+      let options = {
+        query: {
+          stage: 'initiator',
+          signed: signed,
+          message: message,
+          connId: connId
+        },
         'reconnection delay': 0,
         'reopen delay': 0,
         'force new connection': true,
-        transports: ['websocket']
-      })
-      socket.on('connect', () => {
-        done()
-      })
+        transports: ['websocket', 'polling', 'flashsocket'],
+        secure: true
+      }
+      socketManager = SocketIOClient(serverAddress, options)
+      done()
     })
 
     // Close socket connection after each test //
@@ -74,8 +99,23 @@ describe('Signal Server', () => {
       done()
     })
 
-    it('Should be able to connect', () => {
-      expect(socket.connected).toBe(true)
+    /**
+     * Tests
+     */
+
+    it('Should be able to connect', async (done) => {
+      socket = await socketManager.connect()
+      socket.on('connect', () => {
+        expect(socket.connected).toBe(true)
+        done()
+      })
+    })
+
+    it('Should be able to initiate', async (done) => {
+      socket = await socketManager.connect()
+      socket.on(signals.initiated, data => {
+        done()
+      })
     })
   })
 })
