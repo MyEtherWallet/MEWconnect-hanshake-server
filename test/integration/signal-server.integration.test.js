@@ -1,6 +1,7 @@
 'use strict'
 
 // Imports //
+import _ from 'lodash'
 import SocketIO from 'socket.io'
 import SocketIOClient from 'socket.io-client'
 import Redis from 'ioredis'
@@ -45,75 +46,95 @@ describe('Signal Server', () => {
    * Good reference: https://medium.com/@tozwierz/testing-socket-io-with-jest-on-backend-node-js-f71f7ec7010f
    */
   describe('io', () => {
-    // IO "member" variables //
+    // ===================== Test "Member Variables" ======================== //
     let socket
+    let socketManager
     let serverAddress
+    let socketOptions = {
+      'reconnection delay': 0,
+      'reopen delay': 0,
+      'force new connection': true,
+      transports: ['websocket', 'polling', 'flashsocket'],
+      secure: true
+    }
     let publicKey
     let privateKey
     let connId
     let signed
-    let socketManager
 
-    /**
-     * Test initialization processes
-     */
+    // ===================== Test "Member Functions" ======================== //
+
+    const connect = async (options = {}) => {
+      let mergedOptions = _.merge(options, socketOptions)
+      socketManager = SocketIOClient(serverAddress, mergedOptions)
+      socket = await socketManager.connect()
+    }
+
+    const disconnect = async (options) => {
+      if (socket.connected) await socket.disconnect()
+    }
+
+    // ===================== Test Initilization Processes ======================== //
 
     // Initialize variables used in all tests //
     beforeAll(async (done) => {
-      // SigalServer details //
+      // SigalServer Details //
       let address = signalServer.server.address()
       serverAddress = `http://${address.address}:${address.port}`
 
-      // Connection Info //
+      // Keys / Connection Details //
       let keys = CryptoUtils.generateKeys()
       publicKey = keys.publicKey
       privateKey = keys.privateKey
       connId = CryptoUtils.generateConnId(publicKey)
       signed = CryptoUtils.signMessage(privateKey, privateKey)
-      done()
-    })
 
-    // Connect to socketIO before each test //
-    beforeEach(async (done) => {
-      let message = CryptoUtils.generateRandomMessage()
-      let options = {
-        query: {
-          stage: 'initiator',
-          signed: signed,
-          message: message,
-          connId: connId
-        },
-        'reconnection delay': 0,
-        'reopen delay': 0,
-        'force new connection': true,
-        transports: ['websocket', 'polling', 'flashsocket'],
-        secure: true
-      }
-      socketManager = SocketIOClient(serverAddress, options)
       done()
     })
 
     // Close socket connection after each test //
     afterEach(async (done) => {
-      if (socket.connected) await socket.disconnect()
+      await disconnect()
       done()
     })
 
-    /**
-     * Tests
-     */
+    // ===================== Connection Tests ======================== //
 
     it('Should be able to connect', async (done) => {
-      socket = await socketManager.connect()
+      await connect()
       socket.on('connect', () => {
         expect(socket.connected).toBe(true)
         done()
       })
     })
 
-    it('Should be able to initiate', async (done) => {
-      socket = await socketManager.connect()
+    it('<INITIATOR> Should be able to initiate', async (done) => {
+      let message = CryptoUtils.generateRandomMessage()
+      let options = {
+        query: {
+          stage: stages.initiator,
+          signed: signed,
+          message: message,
+          connId: connId
+        }
+      }
+      await connect(options)
       socket.on(signals.initiated, data => {
+        done()
+      })
+    })
+
+    it('<RECEIVER> Should be able to initiate', async (done) => {
+      let options = {
+        query: {
+          stage: stages.receiver,
+          signed: signed,
+          connId: connId
+        }
+      }
+      await connect(options)
+      socket.on(signals.handshake, data => {
+        expect(data).toHaveProperty('toSign')
         done()
       })
     })

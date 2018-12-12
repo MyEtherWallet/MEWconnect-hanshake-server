@@ -18,6 +18,7 @@
     "debug": "~2.6.9",
     "dotenv": "^5.0.1",
     "ioredis": "^3.2.2",
+    "lodash": "^4.17.11",
     "logging": "^3.2.0",
     "module-alias": "^2.1.0",
     "morgan": "^1.9.1",
