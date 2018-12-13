@@ -54,6 +54,7 @@ describe('Signal Server', () => {
       'reconnection delay': 0,
       'reopen delay': 0,
       'force new connection': true,
+      'connect timeout': 5000,
       transports: ['websocket', 'polling', 'flashsocket'],
       secure: true
     }
@@ -67,11 +68,13 @@ describe('Signal Server', () => {
 
     // Initiatior //
     let initiator = {
+      socketManager: {},
       socket: {}
     }
 
     // Receiver //
     let receiver = {
+      socketManager: {},
       socket: {}
     }
 
@@ -82,11 +85,16 @@ describe('Signal Server', () => {
      * @param  {Object} options - Options to extend to merge with the "global" socketOptions
      * @return {Object} - Established socket connection with SignalServer
      */
-    const connect = async (options = {}) => {
+    const connect = async (options = {}, namespace = '') => {
       let mergedOptions = _.merge(options, socketOptions)
-      let socketManager = SocketIOClient(serverAddress, mergedOptions)
+      let socketManager = SocketIOClient(`${serverAddress}/${namespace}`, mergedOptions)
+      console.log(`${serverAddress}/${namespace}`)
       let socket = await socketManager.connect()
       return socket
+      // return {
+      //   socketManager,
+      //   socket
+      // }
     }
 
     /**
@@ -158,16 +166,35 @@ describe('Signal Server', () => {
         })
       })
 
+      it('Should be able to join connId namespace', async (done) => {
+        let options = {
+          query: {
+            stage: stages.receiver,
+            signed: signed,
+            connId: connId
+          }
+        }
+        receiver.socket = await connect(options)
+        receiver.socket.on(signals.handshake, data => {
+          expect(data).toHaveProperty('toSign')
+          done()
+        })
+      })
+
       it('Should be able to sign', async (done) => {
-        // STEVE: HERE //
-        console.log(receiver.socket)
+        let versionObject = await CryptoUtils.encrypt(version, privateKey)
         receiver.socket.binary(false).emit(signals.signature, {
           signed: signed,
           connId: connId,
-          version: version
+          version: versionObject
         })
-        receiver.socket.on(signals.confirmation, data => {
-          // expect(data).toHaveProperty('toSign')
+
+        // Initiator socket will already have joined connId channel, listen for response //
+        initiator.socket.on(signals.confirmation, data => {
+          expect(data).toHaveProperty('connId')
+          expect(data).toHaveProperty('version')
+          let expectedVersionProperties = ['ciphertext', 'ephemPublicKey', 'iv', 'mac']
+          expect(Object.keys(data.version)).toEqual(expect.arrayContaining(expectedVersionProperties))
           done()
         })
       })

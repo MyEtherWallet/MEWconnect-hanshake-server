@@ -176,7 +176,6 @@ var SignalServer = function () {
 
         // Handle signal "signature" event //
         socket.on(_config.signals.signature, function (data) {
-          console.log('eyy');
           verbose(_config.signals.signature + ' signal Recieved for ' + data.connId + ' ');
           extraverbose('Recieved: ', _config.signals.signature);
           _this.receiverConfirm(socket, data);
@@ -243,7 +242,7 @@ var SignalServer = function () {
     value: function initiatorIncomming(socket, details) {
       try {
         initiatorLog('INITIATOR CONNECTION with connection ID: ' + details.connId);
-        extraverbose('Iniator details: ', details);
+        extraverbose('Initiator details: ', details);
         if (this.invalidHex(socket.id)) throw new Error('Connection attempted to pass an invalid socket ID');
         this.redis.createConnectionEntry(details, socket.id).then(function () {
           socket.join(details.connId);
@@ -282,7 +281,6 @@ var SignalServer = function () {
     value: function receiverConfirm(socket, details) {
       var _this3 = this;
 
-      console.log('lala');
       try {
         receiverLog('RECEIVER CONFIRM: ', details.connId);
         if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');

@@ -124,6 +124,7 @@ const encryptedValidator = new Schema({
     required: true
   }
 }, {strip: false});
+
 const tryTurnValidator = new Schema({
   connId: {
     type: String,

@@ -1,7 +1,7 @@
 'use strict'
 
 import crypto from 'crypto'
-// import eccrypto from 'eccrypto'
+import eccrypto from 'eccrypto'
 import ethUtils from 'ethereumjs-util'
 import secp256k1 from 'secp256k1'
 
@@ -57,10 +57,25 @@ export default (() => {
     return combinedHex
   }
 
+  const encrypt = async (data, privateKey) => {
+    let publicKey = eccrypto.getPublic(privateKey)
+    return new Promise((resolve, reject) => {
+      eccrypto
+        .encrypt(publicKey, Buffer.from(data))
+        .then(encryptedData => {
+          resolve(encryptedData)
+        })
+        .catch(error => {
+          reject(error)
+        })
+    })
+  }
+
   return {
     generateKeys,
     generateConnId,
     generateRandomMessage,
-    signMessage
+    signMessage,
+    encrypt
   }
 })()

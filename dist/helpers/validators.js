@@ -138,6 +138,7 @@ var encryptedValidator = new _validate2.default({
     required: true
   }
 }, { strip: false });
+
 var tryTurnValidator = new _validate2.default({
   connId: {
     type: String,
