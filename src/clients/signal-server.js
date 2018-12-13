@@ -127,6 +127,8 @@ export default class SignalServer {
 
       // Handle signal "signature" event //
       socket.on(signals.signature, data => {
+        // STEVE: HERE //
+        console.log('eyy')
         verbose(`${signals.signature} signal Recieved for ${data.connId} `)
         extraverbose('Recieved: ', signals.signature)
         this.receiverConfirm(socket, data)
@@ -225,6 +227,7 @@ export default class SignalServer {
   }
 
   receiverConfirm(socket, details) {
+    console.log('lala')
     try {
       receiverLog('RECEIVER CONFIRM: ', details.connId);
       if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');

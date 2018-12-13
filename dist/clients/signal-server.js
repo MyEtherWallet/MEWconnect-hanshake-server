@@ -176,6 +176,7 @@ var SignalServer = function () {
 
         // Handle signal "signature" event //
         socket.on(_config.signals.signature, function (data) {
+          console.log('eyy');
           verbose(_config.signals.signature + ' signal Recieved for ' + data.connId + ' ');
           extraverbose('Recieved: ', _config.signals.signature);
           _this.receiverConfirm(socket, data);
@@ -281,6 +282,7 @@ var SignalServer = function () {
     value: function receiverConfirm(socket, details) {
       var _this3 = this;
 
+      console.log('lala');
       try {
         receiverLog('RECEIVER CONFIRM: ', details.connId);
         if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');

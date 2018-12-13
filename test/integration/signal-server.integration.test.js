@@ -19,7 +19,7 @@ describe('Signal Server', () => {
   /**
    * Initialization tests involving the instantiation of SignalServer
    */
-  describe('init', () => {
+  describe('Initilization', () => {
     it('Should properly initialize', async () => {
       await signalServer.init()
 
@@ -45,10 +45,10 @@ describe('Signal Server', () => {
    * IO tests involving the socketIO connection of SignalServer.
    * Good reference: https://medium.com/@tozwierz/testing-socket-io-with-jest-on-backend-node-js-f71f7ec7010f
    */
-  describe('io', () => {
+  describe('IO', () => {
     // ===================== Test "Member Variables" ======================== //
-    let socket
-    let socketManager
+
+    // Server/Socket Variables //
     let serverAddress
     let socketOptions = {
       'reconnection delay': 0,
@@ -57,20 +57,43 @@ describe('Signal Server', () => {
       transports: ['websocket', 'polling', 'flashsocket'],
       secure: true
     }
+
+    // Key Variables //
     let publicKey
     let privateKey
     let connId
     let signed
+    let version = '0.0.1'
+
+    // Initiatior //
+    let initiator = {
+      socket: {}
+    }
+
+    // Receiver //
+    let receiver = {
+      socket: {}
+    }
 
     // ===================== Test "Member Functions" ======================== //
 
+    /**
+     * Connect to SignalServer and return the established socket connection
+     * @param  {Object} options - Options to extend to merge with the "global" socketOptions
+     * @return {Object} - Established socket connection with SignalServer
+     */
     const connect = async (options = {}) => {
       let mergedOptions = _.merge(options, socketOptions)
-      socketManager = SocketIOClient(serverAddress, mergedOptions)
-      socket = await socketManager.connect()
+      let socketManager = SocketIOClient(serverAddress, mergedOptions)
+      let socket = await socketManager.connect()
+      return socket
     }
 
-    const disconnect = async (options) => {
+    /**
+     * Disconnect from a particular socket connection
+     * @param  {Object} socket - An established socket connection with SignalServer
+     */
+    const disconnect = async (socket) => {
       if (socket.connected) await socket.disconnect()
     }
 
@@ -92,50 +115,61 @@ describe('Signal Server', () => {
       done()
     })
 
-    // Close socket connection after each test //
-    afterEach(async (done) => {
-      await disconnect()
+    // Close socket connection after tests are completed //
+    afterAll(async (done) => {
+      await disconnect(initiator.socket)
+      await disconnect(receiver.socket)
       done()
     })
 
     // ===================== Connection Tests ======================== //
 
-    it('Should be able to connect', async (done) => {
-      await connect()
-      socket.on('connect', () => {
-        expect(socket.connected).toBe(true)
-        done()
+    describe('Initiator', () => {
+      it('Should be able to initiate', async (done) => {
+        let message = CryptoUtils.generateRandomMessage()
+        let options = {
+          query: {
+            stage: stages.initiator,
+            signed: signed,
+            message: message,
+            connId: connId
+          }
+        }
+        initiator.socket = await connect(options)
+        initiator.socket.on(signals.initiated, async (data) => {
+          done()
+        })
       })
     })
 
-    it('<INITIATOR> Should be able to initiate', async (done) => {
-      let message = CryptoUtils.generateRandomMessage()
-      let options = {
-        query: {
-          stage: stages.initiator,
-          signed: signed,
-          message: message,
-          connId: connId
+    describe('Receiver', () => {
+      it('Should be able to initiate', async (done) => {
+        let options = {
+          query: {
+            stage: stages.receiver,
+            signed: signed,
+            connId: connId
+          }
         }
-      }
-      await connect(options)
-      socket.on(signals.initiated, data => {
-        done()
+        receiver.socket = await connect(options)
+        receiver.socket.on(signals.handshake, data => {
+          expect(data).toHaveProperty('toSign')
+          done()
+        })
       })
-    })
 
-    it('<RECEIVER> Should be able to initiate', async (done) => {
-      let options = {
-        query: {
-          stage: stages.receiver,
+      it('Should be able to sign', async (done) => {
+        // STEVE: HERE //
+        console.log(receiver.socket)
+        receiver.socket.binary(false).emit(signals.signature, {
           signed: signed,
-          connId: connId
-        }
-      }
-      await connect(options)
-      socket.on(signals.handshake, data => {
-        expect(data).toHaveProperty('toSign')
-        done()
+          connId: connId,
+          version: version
+        })
+        receiver.socket.on(signals.confirmation, data => {
+          // expect(data).toHaveProperty('toSign')
+          done()
+        })
       })
     })
   })

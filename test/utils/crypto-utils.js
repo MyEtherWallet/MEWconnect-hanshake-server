@@ -1,16 +1,15 @@
 'use strict'
 
 import crypto from 'crypto'
-import eccrypto from 'eccrypto'
+// import eccrypto from 'eccrypto'
 import ethUtils from 'ethereumjs-util'
 import secp256k1 from 'secp256k1'
 
 export default (() => {
-
-  // let privateKey
-  // let publicKey
-  // let connId
-
+  /**
+   * Generate a public/private keypair using secp256k1
+   * @return {Object} - publicKey/privateKey object
+   */
   const generateKeys = () => {
     let privateKey = Buffer.from(crypto.randomBytes(32), 'hex')
     let publicKey = secp256k1.publicKeyCreate(privateKey)
@@ -20,14 +19,29 @@ export default (() => {
     }
   }
 
+  /**
+   * Generate a connId using given a public key
+   * @param  {String} publicKey - publicKey string (usually generated with generateKeys())
+   * @return {String} - connId string
+   */
   const generateConnId = (publicKey) => {
     return publicKey.toString('hex').slice(32)
   }
 
+  /**
+   * Generate a random message of 32 bytes
+   * @return {String} - The randomly generated string
+   */
   const generateRandomMessage = () => {
     return crypto.randomBytes(32).toString('hex')
   }
 
+  /**
+   * Sign a message using a privateKey
+   * @param  {String} msg - Message to sign/hash
+   * @param  {[type]} privateKey - Private key (usually generated with generateKeys())
+   * @return {String} - Signed message
+   */
   const signMessage = (msg, privateKey) => {
     let hashedMsg = ethUtils.hashPersonalMessage(ethUtils.toBuffer(msg))
     let signed = ethUtils.ecsign(
