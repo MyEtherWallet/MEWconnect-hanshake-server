@@ -2,13 +2,15 @@
 
 // Imports //
 import _ from 'lodash'
+import Peer from 'simple-peer'
 import SocketIO from 'socket.io'
 import SocketIOClient from 'socket.io-client'
 import Redis from 'ioredis'
+import wrtc from 'wrtc'
 
 // Libs //
 import CryptoUtils from '@utils/crypto-utils'
-import { redisConfig, serverConfig, signals, stages } from '@config'
+import { redisConfig, serverConfig, signals, stages, rtcSignals } from '@config'
 import SignalServer from '@clients/signal-server'
 import RedisClient from '@clients/redis-client'
 
@@ -59,6 +61,17 @@ describe('Signal Server', () => {
       secure: true
     }
 
+    // WebRTC Variables //
+    const stunServers = [ { urls: 'stun:global.stun.twilio.com:3478?transport=udp' } ]
+    const defaultWebRTCOptions = {
+      trickle: false,
+      iceTransportPolicy: 'relay',
+      config: {
+        iceServers: stunServers
+      },
+      wrtc: wrtc
+    }
+
     // Key Variables //
     let publicKey
     let privateKey
@@ -68,14 +81,17 @@ describe('Signal Server', () => {
 
     // Initiatior //
     let initiator = {
-      socketManager: {},
-      socket: {}
+      socket: {},
+      version: {},
+      peer: {}
     }
 
     // Receiver //
     let receiver = {
-      socketManager: {},
-      socket: {}
+      socket: {},
+      version: {},
+      peer: {},
+      offer: {}
     }
 
     // ===================== Test "Member Functions" ======================== //
@@ -88,13 +104,8 @@ describe('Signal Server', () => {
     const connect = async (options = {}, namespace = '') => {
       let mergedOptions = _.merge(options, socketOptions)
       let socketManager = SocketIOClient(`${serverAddress}/${namespace}`, mergedOptions)
-      console.log(`${serverAddress}/${namespace}`)
       let socket = await socketManager.connect()
       return socket
-      // return {
-      //   socketManager,
-      //   socket
-      // }
     }
 
     /**
@@ -107,7 +118,10 @@ describe('Signal Server', () => {
 
     // ===================== Test Initilization Processes ======================== //
 
-    // Initialize variables used in all tests //
+    /**
+     * Before all tests, get the SignalServer address and generate keys
+     * used for communication.
+     */
     beforeAll(async (done) => {
       // SigalServer Details //
       let address = signalServer.server.address()
@@ -123,78 +137,117 @@ describe('Signal Server', () => {
       done()
     })
 
-    // Close socket connection after tests are completed //
+    /**
+     * After all tests are completed, close socket connections.
+     */
     afterAll(async (done) => {
       await disconnect(initiator.socket)
       await disconnect(receiver.socket)
       done()
     })
 
-    // ===================== Connection Tests ======================== //
+    // ===================== Initial Signaling Tests ======================== //
 
-    describe('Initiator', () => {
-      it('Should be able to initiate', async (done) => {
-        let message = CryptoUtils.generateRandomMessage()
-        let options = {
-          query: {
-            stage: stages.initiator,
-            signed: signed,
-            message: message,
-            connId: connId
+    describe('Initial Signaling', () => {
+      describe('Initiator', () => {
+        it('<IO>Should be able to initiate', async (done) => {
+          let message = CryptoUtils.generateRandomMessage()
+          let options = {
+            query: {
+              stage: stages.initiator,
+              signed: signed,
+              message: message,
+              connId: connId
+            }
           }
-        }
-        initiator.socket = await connect(options)
-        initiator.socket.on(signals.initiated, async (data) => {
-          done()
+          initiator.socket = await connect(options)
+          initiator.socket.on(signals.initiated, async (data) => {
+            done()
+          })
+        })
+      })
+
+      describe('Receiver', () => {
+        it('<IO>Should be able to initiate', async (done) => {
+          let options = {
+            query: {
+              stage: stages.receiver,
+              signed: signed,
+              connId: connId
+            }
+          }
+          receiver.socket = await connect(options)
+          receiver.socket.on(signals.handshake, data => {
+            expect(data).toHaveProperty('toSign')
+            done()
+          })
+        })
+
+        it('<IO>Should be able to sign', async (done) => {
+          let versionObject = await CryptoUtils.encrypt(version, privateKey)
+          receiver.socket.binary(false).emit(signals.signature, {
+            signed: signed,
+            connId: connId,
+            version: versionObject
+          })
+
+          // Initiator socket will already have joined connId channel, listen for response //
+          initiator.socket.on(signals.confirmation, data => {
+            initiator.version = data.version
+            expect(data).toHaveProperty('connId')
+            expect(data).toHaveProperty('version')
+            let expectedVersionProperties = ['ciphertext', 'ephemPublicKey', 'iv', 'mac']
+            expect(Object.keys(data.version)).toEqual(expect.arrayContaining(expectedVersionProperties))
+            done()
+          })
         })
       })
     })
 
-    describe('Receiver', () => {
-      it('Should be able to initiate', async (done) => {
-        let options = {
-          query: {
-            stage: stages.receiver,
-            signed: signed,
-            connId: connId
+    // ===================== Offer Creation Tests ======================== //
+
+    describe('Offer Creation', () => {
+      describe('Initiator', () => {
+        it('<WEB RTC>Should be able to send offer', async (done) => {
+          // let plainTextVersion = await CryptoUtils.decrypt(initiator.version, privateKey)
+          // let webRtcConfig = { servers: stunServers }
+
+          // Add initiator property to default options //
+          let webRTCOptions = {
+            initiator: true,
+            ...defaultWebRTCOptions
           }
-        }
-        receiver.socket = await connect(options)
-        receiver.socket.on(signals.handshake, data => {
-          expect(data).toHaveProperty('toSign')
-          done()
+
+          // Create WebRTC peer //
+          initiator.peer = new Peer(webRTCOptions)
+          initiator.peer.on(rtcSignals.signal, async (data) => {
+            expect(data).toHaveProperty('type')
+            expect(data).toHaveProperty('sdp')
+
+            // Send WebRTC offer as encrypted string //
+            let encryptedSend = await CryptoUtils.encrypt(JSON.stringify(data), privateKey)
+
+            // Emit offer signal for receiver //
+            initiator.socket.binary(false).emit(signals.offerSignal, {
+              data: encryptedSend,
+              connId: connId,
+              options: stunServers
+            })
+          })
+
+          // Receiver should receive offer signal //
+          receiver.socket.on(signals.offer, async (data) => {
+            let decryptedMessage = await CryptoUtils.decrypt(data.data, privateKey)
+            receiver.offer = JSON.parse(decryptedMessage)
+            done()
+          })
         })
       })
+      describe('Receiver', () => {
+        it('<WEB RTC>Should be able to recieve offer', async (done) => {
+          let expectedVersionProperties = ['type', 'sdp']
+          expect(Object.keys(receiver.offer)).toEqual(expect.arrayContaining(expectedVersionProperties))
 
-      it('Should be able to join connId namespace', async (done) => {
-        let options = {
-          query: {
-            stage: stages.receiver,
-            signed: signed,
-            connId: connId
-          }
-        }
-        receiver.socket = await connect(options)
-        receiver.socket.on(signals.handshake, data => {
-          expect(data).toHaveProperty('toSign')
-          done()
-        })
-      })
-
-      it('Should be able to sign', async (done) => {
-        let versionObject = await CryptoUtils.encrypt(version, privateKey)
-        receiver.socket.binary(false).emit(signals.signature, {
-          signed: signed,
-          connId: connId,
-          version: versionObject
-        })
-
-        // Initiator socket will already have joined connId channel, listen for response //
-        initiator.socket.on(signals.confirmation, data => {
-          expect(data).toHaveProperty('connId')
-          expect(data).toHaveProperty('version')
-          let expectedVersionProperties = ['ciphertext', 'ephemPublicKey', 'iv', 'mac']
-          expect(Object.keys(data.version)).toEqual(expect.arrayContaining(expectedVersionProperties))
           done()
         })
       })

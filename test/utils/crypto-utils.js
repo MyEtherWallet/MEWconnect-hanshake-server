@@ -57,9 +57,16 @@ export default (() => {
     return combinedHex
   }
 
+  /**
+   * Encrypt a set of data given a private key using eccrypto
+   * @param  {Object/String} data - Data to encrypt
+   * @param  {String} privateKey - Private key (usually generated with generateKeys())
+   * @return {Object} - Encrypted data object with the following properties:
+   *                    'ciphertext', 'ephemPublicKey', 'iv', 'mac'
+   */
   const encrypt = async (data, privateKey) => {
-    let publicKey = eccrypto.getPublic(privateKey)
     return new Promise((resolve, reject) => {
+      let publicKey = eccrypto.getPublic(privateKey)
       eccrypto
         .encrypt(publicKey, Buffer.from(data))
         .then(encryptedData => {
@@ -71,11 +78,60 @@ export default (() => {
     })
   }
 
+  /**
+   * Decrypt an encrypted data object given a private key using eccrypto
+   * @param  {Object} data - An encrypted data object (usually using the encrypt() function)
+   * @param  {String} privateKey - Private key (usually generated with generateKeys())
+   * @return {Object} - Decrypted data
+   */
+  const decrypt = async (data, privateKey) => {
+    return new Promise((resolve, reject) => {
+      eccrypto
+        .decrypt(privateKey, {
+          ciphertext: Buffer.from(data.ciphertext),
+          ephemPublicKey: Buffer.from(data.ephemPublicKey),
+          iv: Buffer.from(data.iv),
+          mac: Buffer.from(data.mac)
+        })
+        .then(decrypted => {
+          let result
+          try {
+            if (isJSON(decrypted)) {
+              const humanRadable = JSON.parse(decrypted)
+              if (Array.isArray(humanRadable)) {
+                result = humanRadable[0]
+              } else {
+                result = humanRadable
+              }
+            } else {
+              result = decrypted.toString()
+            }
+          } catch (e) {
+            reject(e)
+          }
+          resolve(JSON.stringify(result))
+        })
+        .catch(error => {
+          reject(error)
+        })
+    })
+  }
+
+  const isJSON = (arg) => {
+    try {
+      JSON.parse(arg);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   return {
     generateKeys,
     generateConnId,
     generateRandomMessage,
     signMessage,
-    encrypt
+    encrypt,
+    decrypt
   }
 })()

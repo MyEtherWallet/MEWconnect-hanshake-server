@@ -49,7 +49,9 @@
     "jest": "^23.6.0",
     "mocha": "^5.2.0",
     "regenerator-runtime": "^0.13.1",
-    "secp256k1": "^3.5.2"
+    "secp256k1": "^3.5.2",
+    "simple-peer": "^9.2.0",
+    "wrtc": "^0.3.3"
   },
   "_moduleAliases": {
     "@": "dist",

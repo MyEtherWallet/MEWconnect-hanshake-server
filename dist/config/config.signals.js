@@ -30,5 +30,14 @@ var stages = {
   receiver: 'receiver'
 };
 
+var rtcSignals = {
+  error: 'error',
+  connect: 'connect',
+  close: 'close',
+  data: 'data',
+  signal: 'signal'
+};
+
 exports.signals = signals;
 exports.stages = stages;
+exports.rtcSignals = rtcSignals;

@@ -27,7 +27,16 @@ const stages = {
   receiver: 'receiver'
 }
 
+const rtcSignals = {
+  error: 'error',
+  connect: 'connect',
+  close: 'close',
+  data: 'data',
+  signal: 'signal'
+}
+
 export {
   signals,
-  stages
+  stages,
+  rtcSignals
 }
