@@ -150,8 +150,9 @@ describe('Signal Server', () => {
     // ===================== Initial Signaling Tests ======================== //
 
     describe('Initial Signaling', () => {
-      describe('Initiator', () => {
-        it('<IO>Should be able to initiate', async (done) => {
+
+      describe('Connect [Server → Initiator]', () => {
+        it('Should be able to initiate socket connection', async (done) => {
           let message = CryptoUtils.generateRandomMessage()
           let options = {
             query: {
@@ -168,8 +169,8 @@ describe('Signal Server', () => {
         })
       })
 
-      describe('Receiver', () => {
-        it('<IO>Should be able to initiate', async (done) => {
+      describe('Handshake [Server → Receiver]', () => {
+        it('Should be able to initiate socket connection with credentials created by initiator', async (done) => {
           let options = {
             query: {
               stage: stages.receiver,
@@ -183,8 +184,10 @@ describe('Signal Server', () => {
             done()
           })
         })
+      })
 
-        it('<IO>Should be able to sign', async (done) => {
+      describe('Signature [Receiver → Server]', () => {
+        it('Should be able to sign with identity credentials supplied to server for validation against credentials initially supplied to the server by the initiator', async (done) => {
           let versionObject = await CryptoUtils.encrypt(version, privateKey)
           receiver.socket.binary(false).emit(signals.signature, {
             signed: signed,
@@ -210,9 +213,6 @@ describe('Signal Server', () => {
     describe('Offer Creation', () => {
       describe('Initiator', () => {
         it('<WEB RTC>Should be able to send offer', async (done) => {
-          // let plainTextVersion = await CryptoUtils.decrypt(initiator.version, privateKey)
-          // let webRtcConfig = { servers: stunServers }
-
           // Add initiator property to default options //
           let webRTCOptions = {
             initiator: true,
