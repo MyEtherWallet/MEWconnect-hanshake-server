@@ -52,7 +52,7 @@ describe('Signal Server', () => {
 
     // Server/Socket Variables //
     let serverAddress
-    let socketOptions = {
+    const socketOptions = {
       'reconnection delay': 0,
       'reopen delay': 0,
       'force new connection': true,
@@ -77,13 +77,14 @@ describe('Signal Server', () => {
     let privateKey
     let connId
     let signed
-    let version = '0.0.1'
+    const version = '0.0.1'
 
     // Initiatior //
     let initiator = {
       socket: {},
       version: {},
-      peer: {}
+      peer: {},
+      answer: {}
     }
 
     // Receiver //
@@ -235,7 +236,7 @@ describe('Signal Server', () => {
             })
           })
 
-          // Receiver should receive offer signal //
+          // Receiver should receive offer signal -- check properties in own test //
           receiver.socket.on(signals.offer, async (data) => {
             let decryptedMessage = await CryptoUtils.decrypt(data.data, privateKey)
             receiver.offer = JSON.parse(decryptedMessage)
@@ -247,10 +248,68 @@ describe('Signal Server', () => {
         it('<WEB RTC>Should be able to recieve offer', async (done) => {
           let expectedVersionProperties = ['type', 'sdp']
           expect(Object.keys(receiver.offer)).toEqual(expect.arrayContaining(expectedVersionProperties))
-
           done()
         })
       })
+    })
+
+    // ===================== Answer Creation Tests ======================== //
+
+    describe('Answer Creation', () => {
+      describe('Receiver', () => {
+        it('<WEB RTC>Should be able to send answer', async (done) => {
+
+          let webRTCOptions = {
+            ...defaultWebRTCOptions
+          }
+
+          // Create WebRTC peer //
+          receiver.peer = new Peer(webRTCOptions)
+          receiver.peer.signal(receiver.offer)
+          receiver.peer.on(rtcSignals.signal, async (data) => {
+            expect(data).toHaveProperty('type')
+            expect(data).toHaveProperty('sdp')
+
+            // Send WebRTC offer as encrypted string //
+            let encryptedSend = await CryptoUtils.encrypt(JSON.stringify(data), privateKey)
+
+            // Emit offer signal for receiver //
+            receiver.socket.binary(false).emit(signals.answerSignal, {
+              data: encryptedSend,
+              connId: connId
+            })
+          })
+
+          receiver.peer.on(rtcSignals.error, async (data) => {
+            // FAIL //
+          })
+
+          // Success //
+          initiator.socket.on(signals.answer, async (data) => {
+            console.log(data)
+            let decryptedMessage = await CryptoUtils.decrypt(data.data, privateKey)
+            initiator.answer = JSON.parse(decryptedMessage)
+            done()
+          })
+        })
+      })
+      // describe('Initiator', () => {
+      //   it('<WEB RTC>Should be able to send answer', async (done) => {
+      //     // Send WebRTC answer as encrypted string //
+      //     let encryptedSend = await CryptoUtils.encrypt(JSON.stringify(receiver.offer), privateKey)
+
+      //     // Send answer signal //
+      //     receiver.socket.binary(false).emit(signals.answerSignal, {
+      //       data: encryptedSend,
+      //       connId: connId
+      //     })
+
+      //     // Success //
+      //     initiator.socket.on(signals.answer, async (data) => {
+      //       done()
+      //     })
+      //   })
+      // })
     })
   })
 })
