@@ -202,13 +202,9 @@ var SignalServer = function () {
         // Handle signal "rtcConnected" event //
         socket.on(_config.signals.rtcConnected, function (connId) {
           // Clean up client record
+          socket.emit(_config.signals.receivedSignal, _config.signals.rtcConnected);
           verbose('Removing connection entry for: ' + connId);
           _this.redis.removeConnectionEntry(connId);
-          _this.io.to(connId).emit(_config.signals.rtcEstablished, {
-            data: {
-              msg: 'WebRTC Connection Established. Goodbye.'
-            }
-          });
           // socket.leave(connId)
           verbose('WebRTC CONNECTED', connId);
         });
