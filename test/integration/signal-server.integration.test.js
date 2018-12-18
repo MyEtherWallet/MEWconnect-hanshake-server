@@ -44,10 +44,10 @@ describe('Signal Server', () => {
   })
 
   /**
-   * IO tests involving the socketIO connection of SignalServer.
+   * Signaling tests involving the socketIO connection of SignalServer.
    * Good reference: https://medium.com/@tozwierz/testing-socket-io-with-jest-on-backend-node-js-f71f7ec7010f
    */
-  describe('IO', () => {
+  describe('Signaling', () => {
     // ===================== Test "Member Variables" ======================== //
 
     // Server/Socket Variables //
@@ -219,7 +219,7 @@ describe('Signal Server', () => {
             ...defaultWebRTCOptions
           }
 
-          // Create WebRTC peer //
+          // Create Initiator WebRTC peer //
           initiator.peer = new Peer(webRTCOptions)
           initiator.peer.on(rtcSignals.signal, async (data) => {
             expect(data).toHaveProperty('type')
@@ -236,7 +236,7 @@ describe('Signal Server', () => {
             })
           })
 
-          // Receiver should receive offer signal -- check properties in own test //
+          // Success - Receiver should receive offer signal -- check properties in own test //
           receiver.socket.on(signals.offer, async (data) => {
             let decryptedMessage = await CryptoUtils.decrypt(data.data, privateKey)
             receiver.offer = JSON.parse(decryptedMessage)
@@ -244,6 +244,7 @@ describe('Signal Server', () => {
           })
         })
       })
+
       describe('Receiver', () => {
         it('<WEB RTC>Should be able to recieve offer', async (done) => {
           let expectedVersionProperties = ['type', 'sdp']
@@ -258,12 +259,11 @@ describe('Signal Server', () => {
     describe('Answer Creation', () => {
       describe('Receiver', () => {
         it('<WEB RTC>Should be able to send answer', async (done) => {
-
           let webRTCOptions = {
             ...defaultWebRTCOptions
           }
 
-          // Create WebRTC peer //
+          // Create Receiver WebRTC peer //
           receiver.peer = new Peer(webRTCOptions)
           receiver.peer.signal(receiver.offer)
           receiver.peer.on(rtcSignals.signal, async (data) => {
@@ -284,32 +284,87 @@ describe('Signal Server', () => {
             // FAIL //
           })
 
-          // Success //
+          // Success - Initiator should receive answer signal -- check properties in own test //
           initiator.socket.on(signals.answer, async (data) => {
-            console.log(data)
             let decryptedMessage = await CryptoUtils.decrypt(data.data, privateKey)
             initiator.answer = JSON.parse(decryptedMessage)
             done()
           })
         })
       })
-      // describe('Initiator', () => {
-      //   it('<WEB RTC>Should be able to send answer', async (done) => {
-      //     // Send WebRTC answer as encrypted string //
-      //     let encryptedSend = await CryptoUtils.encrypt(JSON.stringify(receiver.offer), privateKey)
 
-      //     // Send answer signal //
-      //     receiver.socket.binary(false).emit(signals.answerSignal, {
-      //       data: encryptedSend,
-      //       connId: connId
-      //     })
+      describe('Initiator', () => {
+        it('<WEB RTC>Should be able to recieve answer', async (done) => {
+          let expectedVersionProperties = ['type', 'sdp']
+          expect(Object.keys(initiator.answer)).toEqual(expect.arrayContaining(expectedVersionProperties))
+          done()
+        })
+      })
+    })
 
-      //     // Success //
-      //     initiator.socket.on(signals.answer, async (data) => {
-      //       done()
-      //     })
-      //   })
-      // })
+    // ===================== RTC Connection Tests ======================== //
+
+    describe('RTC Connection', () => {
+      describe('Initiator & Receiver', () => {
+        it('<WEB RTC>Should be able to establish RTC connection', async (done) => {
+          // Ensure Receiver is connected //
+          let receiverPeerConnectPromise = new Promise((resolve, reject) => {
+            receiver.peer.on(rtcSignals.connect, data => {
+              resolve()
+            })
+            receiver.peer.on(rtcSignals.error, err => {
+              reject(err)
+            })
+          })
+
+          // Ensure Initiator is connected. Must also send signal to connect to receiver //
+          let initiatorPeerConnectPromise = new Promise((resolve, reject) => {
+            initiator.peer.signal(initiator.answer)
+            initiator.peer.on(rtcSignals.connect, data => {
+              resolve()
+            })
+            initiator.peer.on(rtcSignals.error, err => {
+              reject(err)
+            })
+          })
+
+          // Await promises from both receiver and initiator //
+          await Promise.all([
+            receiverPeerConnectPromise,
+            initiatorPeerConnectPromise
+          ])
+
+          // Success //
+          done()
+        })
+
+        it('<IO>Should be able to inform SignalServer of RTC connection', async (done) => {
+          // Initiator sending confirmation of connection //
+          let initiatorRtcConnectPromise = new Promise((resolve, reject) => {
+            initiator.socket.binary(false).emit(signals.rtcConnected, connId)
+            initiator.socket.on(signals.rtcEstablished, data => {
+              resolve()
+            })
+          })
+
+          /// Receiver sending confirmation of connection //
+          let receiverRtcConnectPromise = new Promise((resolve, reject) => {
+            receiver.socket.binary(false).emit(signals.rtcConnected, connId)
+            receiver.socket.on(signals.rtcEstablished, data => {
+              resolve()
+            })
+          })
+
+          // Await promises from both receiver and initiator //
+          await Promise.all([
+            initiatorRtcConnectPromise,
+            receiverRtcConnectPromise
+          ])
+
+          // Success //
+          done()
+        })
+      })
     })
   })
 })

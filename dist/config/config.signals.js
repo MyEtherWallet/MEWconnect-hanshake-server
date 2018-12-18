@@ -16,6 +16,7 @@ var signals = {
   answer: 'answer',
   initiated: 'initiated',
   rtcConnected: 'rtcConnected',
+  rtcEstablished: 'rtcEstablished',
   disconnect: 'disconnect',
   handshake: 'handshake',
   confirmation: 'confirmation',

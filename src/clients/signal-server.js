@@ -152,7 +152,12 @@ export default class SignalServer {
         // Clean up client record
         verbose(`Removing connection entry for: ${connId}`)
         this.redis.removeConnectionEntry(connId)
-        socket.leave(connId)
+        this.io.to(connId).emit(signals.rtcEstablished, {
+          data: {
+            msg: 'WebRTC Connection Established. Goodbye.'
+          }
+        })
+        // socket.leave(connId)
         verbose('WebRTC CONNECTED', connId)
       })
 
