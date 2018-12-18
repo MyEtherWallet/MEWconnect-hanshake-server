@@ -23,7 +23,8 @@ var signals = {
   socketTimeout: 'socketTimeout',
   invalidConnection: 'InvalidConnection',
   confirmationFailedBusy: 'confirmationFailedBusy',
-  confirmationFailed: 'confirmationFailed'
+  confirmationFailed: 'confirmationFailed',
+  receivedSignal: 'receivedSignal'
 };
 
 var stages = {

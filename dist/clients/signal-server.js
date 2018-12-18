@@ -176,6 +176,7 @@ var SignalServer = function () {
 
         // Handle signal "signature" event //
         socket.on(_config.signals.signature, function (data) {
+          socket.emit(_config.signals.receivedSignal, _config.signals.signature);
           verbose(_config.signals.signature + ' signal Recieved for ' + data.connId + ' ');
           extraverbose('Recieved: ', _config.signals.signature);
           _this.receiverConfirm(socket, data);
@@ -183,12 +184,14 @@ var SignalServer = function () {
 
         // Handle signal "offerSignal" event //
         socket.on(_config.signals.offerSignal, function (offerData) {
+          socket.emit(_config.signals.receivedSignal, _config.signals.offerSignal);
           verbose(_config.signals.offerSignal + ' signal Recieved for ' + offerData.connId + ' ');
           _this.io.to(offerData.connId).emit(_config.signals.offer, { data: offerData.data });
         });
 
         // Handle signal "answerSignal" event //
         socket.on(_config.signals.answerSignal, function (answerData) {
+          socket.emit(_config.signals.receivedSignal, _config.signals.answerSignal);
           verbose(_config.signals.answerSignal + ' signal Recieved for ' + answerData.connId + ' ');
           _this.io.to(answerData.connId).emit(_config.signals.answer, {
             data: answerData.data,

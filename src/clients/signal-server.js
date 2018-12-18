@@ -127,6 +127,7 @@ export default class SignalServer {
 
       // Handle signal "signature" event //
       socket.on(signals.signature, data => {
+        socket.emit(signals.receivedSignal, signals.signature)
         verbose(`${signals.signature} signal Recieved for ${data.connId} `)
         extraverbose('Recieved: ', signals.signature)
         this.receiverConfirm(socket, data)
@@ -134,12 +135,14 @@ export default class SignalServer {
 
       // Handle signal "offerSignal" event //
       socket.on(signals.offerSignal, offerData => {
+        socket.emit(signals.receivedSignal, signals.offerSignal)
         verbose(`${signals.offerSignal} signal Recieved for ${offerData.connId} `)
         this.io.to(offerData.connId).emit(signals.offer, {data: offerData.data})
       })
 
       // Handle signal "answerSignal" event //
       socket.on(signals.answerSignal, answerData => {
+        socket.emit(signals.receivedSignal, signals.answerSignal)
         verbose(`${signals.answerSignal} signal Recieved for ${answerData.connId} `)
         this.io.to(answerData.connId).emit(signals.answer, {
           data: answerData.data,

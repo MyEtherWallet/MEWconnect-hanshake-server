@@ -20,7 +20,8 @@ const signals = {
   socketTimeout: 'socketTimeout',
   invalidConnection: 'InvalidConnection',
   confirmationFailedBusy: 'confirmationFailedBusy',
-  confirmationFailed: 'confirmationFailed'
+  confirmationFailed: 'confirmationFailed',
+  receivedSignal: 'receivedSignal'
 }
 
 const stages = {
