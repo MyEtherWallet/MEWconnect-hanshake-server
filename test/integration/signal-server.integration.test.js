@@ -14,7 +14,42 @@ import { redisConfig, serverConfig, signals, stages, rtcSignals } from '@config'
 import SignalServer from '@clients/signal-server'
 import RedisClient from '@clients/redis-client'
 
-// ===================== Test "Member Variables" ======================== //
+/*
+|--------------------------------------------------------------------------
+|
+| SignalServer Integration Tests
+|
+|--------------------------------------------------------------------------
+|
+| 12/18/2018
+|
+| The goal of these integration tests are to ensure the functionality of the SignalServer.
+| The SignalServer attempts to pair two "signaling" peers together via a secure Socket.io connection.
+| These peers will then establish a webRTC connection to each other, allowing
+| secure communication using the credentials created during the pairing process.
+|
+| The tests attempt to mirror the process defined in the following documentation outline:
+| https://docs.google.com/document/d/19acrYB3iLT4j9JDg0xGcccLXFenqfSlNiKVpXOdLL6Y
+|
+| There are:
+|
+| 1. Initialization
+  2. Pairing
+|     a. Initial Signaling
+|     b. Offer Creation
+|     c. Answer Creation
+|     d. RTC Connection
+| 3. RTC
+|
+*/
+
+/*
+|--------------------------------------------------------------------------
+|
+|  Test "Member Variables"
+|
+|--------------------------------------------------------------------------
+*/
 
 // Instantiate SignalServer instance //
 const signalServer = new SignalServer()
@@ -64,7 +99,13 @@ let receiver = {
   offer: {}
 }
 
-// ===================== Test "Member Functions" ======================== //
+/*
+|--------------------------------------------------------------------------
+|
+|  Test "Member Functions"
+|
+|--------------------------------------------------------------------------
+*/
 
 /**
  * Connect to SignalServer and return the established socket connection
@@ -86,12 +127,20 @@ const disconnect = async (socket) => {
   if (socket.connected) await socket.disconnect()
 }
 
-// ============================ Test Start =============================== //
+/*
+|--------------------------------------------------------------------------
+|
+|  Test Start
+|
+|--------------------------------------------------------------------------
+*/
 
 describe('Signal Server', () => {
-  /**
-   * Initialization tests involving the instantiation of SignalServer
-   */
+  /*
+    ======================================================================
+    1. Initialization
+    =======================================================================
+  */
   describe('Initilization', () => {
     it('Should properly initialize', async () => {
       await signalServer.init()
@@ -114,6 +163,11 @@ describe('Signal Server', () => {
     })
   })
 
+  /*
+    ======================================================================
+    2. Pairing
+    =======================================================================
+  */
   describe('Pairing', () => {
     /**
      * Before all tests, get the SignalServer address and generate keys
@@ -153,12 +207,11 @@ describe('Signal Server', () => {
       done()
     })
 
-    /**
-     * Initial signaling tests involving the socketIO connection of SignalServer.
-     * The SignalServer aims to establish a secure communication channel between two peers,
-     * and connect them via webRTC.
-     */
-
+    /*
+      ======================================================================
+      2a. Pairing -> Initial Signaling
+      =======================================================================
+    */
     describe('Initial Signaling', () => {
       describe('Connect [Server → Initiator]', () => {
         it('Should initiate socket connection', async (done) => {
@@ -224,8 +277,11 @@ describe('Signal Server', () => {
       })
     })
 
-    // ===================== Offer Creation Tests ======================== //
-
+    /*
+      ======================================================================
+      2b. Pairing -> Offer Creation
+      =======================================================================
+    */
     describe('Offer Creation', () => {
       describe('OfferSignal [Initiator → Server]', () => {
         it('Should send an offer and server list to the SignalServer for retransmission to the receiver', async (done) => {
@@ -275,8 +331,11 @@ describe('Signal Server', () => {
       })
     })
 
-    // ===================== Answer Creation Tests ======================== //
-
+    /*
+      ======================================================================
+      2c. Pairing -> Answer Creation
+      =======================================================================
+    */
     describe('Answer Creation', () => {
       describe('AnswerSignal [Receiver → Server]', () => {
         it('Should transmit an answer to the received offer for retransmission to the initiator', async (done) => {
@@ -327,7 +386,14 @@ describe('Signal Server', () => {
           })
         })
       })
+    })
 
+    /*
+      ======================================================================
+      2d. Pairing -> RTC Connection
+      =======================================================================
+    */
+    describe('RTC Connection', () => {
       describe('RTC Connection [Initiator & Receiver] ', () => {
         it('Should establish RTC connection between the initiator and receiver', async (done) => {
           // Ensure Initiator is connected. Must also send signal to connect to receiver //
@@ -383,5 +449,9 @@ describe('Signal Server', () => {
       })
     })
   })
-  // ===================== RTC Connection Tests ======================== //
+  /*
+    ======================================================================
+    3. RTC Connection
+    =======================================================================
+  */
 })
