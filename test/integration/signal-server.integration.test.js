@@ -44,11 +44,9 @@ import RedisClient from '@clients/redis-client'
 */
 
 /*
-|--------------------------------------------------------------------------
-|
-|  Test "Member Variables"
-|
-|--------------------------------------------------------------------------
+  ======================================================================
+    Test "Member Variables"
+  =======================================================================
 */
 
 // Instantiate SignalServer instance //
@@ -100,11 +98,9 @@ let receiver = {
 }
 
 /*
-|--------------------------------------------------------------------------
-|
-|  Test "Member Functions"
-|
-|--------------------------------------------------------------------------
+  ======================================================================
+    Test "Member Functions"
+  =======================================================================
 */
 
 /**
@@ -132,13 +128,10 @@ const disconnect = async (socket) => {
 }
 
 /*
-|--------------------------------------------------------------------------
-|
-|  Test Start
-|
-|--------------------------------------------------------------------------
+  ======================================================================
+    Test Start
+  =======================================================================
 */
-
 describe('Signal Server', () => {
   /*
     ======================================================================
@@ -217,6 +210,11 @@ describe('Signal Server', () => {
       =======================================================================
     */
     describe('Initial Signaling', () => {
+      /*
+        ======================================================================
+        2a. Pairing -> Initial Signaling -> Connect [Server → Initiator]
+        =======================================================================
+      */
       describe('Connect [Server → Initiator]', () => {
         const message = CryptoUtils.generateRandomMessage()
         const connectionOptions = {
@@ -228,6 +226,11 @@ describe('Signal Server', () => {
           }
         }
 
+        /*
+          ======================================================================
+          2a. Pairing -> Initial Signaling -> Connect [Server → Initiator] -> FAIL
+          =======================================================================
+        */
         describe('<Fail>', () => {
           it('Should not connect with invalid @stage property', async (done) => {
             let options = _.cloneDeep(connectionOptions)
@@ -276,6 +279,11 @@ describe('Signal Server', () => {
           })
         })
 
+        /*
+          ======================================================================
+          2a. Pairing -> Initial Signaling -> Connect [Server → Initiator] -> SUCCESS
+          =======================================================================
+        */
         describe('<Success>', () => {
           it('Should initiate socket connection', async (done) => {
             let message = CryptoUtils.generateRandomMessage()
@@ -295,6 +303,11 @@ describe('Signal Server', () => {
         })
       })
 
+      /*
+        ======================================================================
+        2a. Pairing -> Initial Signaling -> Handshake [Server → Receiver]
+        =======================================================================
+      */
       describe('Handshake [Server → Receiver]', () => {
         const connectionOptions = {
           query: {
@@ -304,6 +317,11 @@ describe('Signal Server', () => {
           }
         }
 
+        /*
+          ======================================================================
+          2a. Pairing -> Initial Signaling -> Handshake [Server → Receiver] -> FAIL
+          =======================================================================
+        */
         describe('<Fail>', () => {
           it('Should not connect with invalid @stage property', async (done) => {
             let options = _.cloneDeep(connectionOptions)
@@ -352,6 +370,11 @@ describe('Signal Server', () => {
           })
         })
 
+        /*
+          ======================================================================
+          2a. Pairing -> Initial Signaling -> Handshake [Server → Receiver] -> SUCCESS
+          =======================================================================
+        */
         describe('<Success>', () => {
           it('Should initiate socket connection with credentials created by initiator', async (done) => {
             let options = {
@@ -370,6 +393,11 @@ describe('Signal Server', () => {
         })
       })
 
+      /*
+        ======================================================================
+        2a. Pairing -> Initial Signaling -> Signature [Receiver → Server]
+        =======================================================================
+      */
       describe('Signature [Receiver → Server]', () => {
         it('Should sign with identity credentials supplied to server for validation against credentials initially supplied to the server by the initiator', async (done) => {
           let versionObject = await CryptoUtils.encrypt(version, privateKey)
