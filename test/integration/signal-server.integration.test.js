@@ -31,7 +31,8 @@ import RedisClient from '@clients/redis-client'
 | The tests attempt to mirror the process defined in the following documentation outline:
 | https://docs.google.com/document/d/19acrYB3iLT4j9JDg0xGcccLXFenqfSlNiKVpXOdLL6Y
 |
-| There are:
+| There are (2) primary processes that must be tested, the majority of which occurs in the
+| "Pairing" section:
 |
 | 1. Initialization
   2. Pairing
@@ -39,7 +40,6 @@ import RedisClient from '@clients/redis-client'
 |     b. Offer Creation
 |     c. Answer Creation
 |     d. RTC Connection
-| 3. RTC
 |
 */
 
@@ -378,7 +378,6 @@ describe('Signal Server', () => {
           initiator.socket.on(signals.answer, async (data) => {
             let decryptedMessage = await CryptoUtils.decrypt(data.data, privateKey)
 
-            // Parse answer //
             initiator.answer = JSON.parse(decryptedMessage)
             let expectedVersionProperties = ['type', 'sdp']
             expect(Object.keys(initiator.answer)).toEqual(expect.arrayContaining(expectedVersionProperties))
@@ -449,9 +448,4 @@ describe('Signal Server', () => {
       })
     })
   })
-  /*
-    ======================================================================
-    3. RTC Connection
-    =======================================================================
-  */
 })
