@@ -113,10 +113,14 @@ let receiver = {
  * @return {Object} - Established socket connection with SignalServer
  */
 const connect = async (options = {}, namespace = '') => {
-  let mergedOptions = _.merge(options, socketOptions)
-  let socketManager = SocketIOClient(`${serverAddress}/${namespace}`, mergedOptions)
-  let socket = await socketManager.connect()
-  return socket
+  try {
+    let mergedOptions = _.merge(options, socketOptions)
+    let socketManager = SocketIOClient(`${serverAddress}/${namespace}`, mergedOptions)
+    let socket = await socketManager.connect()
+    return socket
+  } catch (e) {
+    return e
+  }
 }
 
 /**
@@ -214,36 +218,154 @@ describe('Signal Server', () => {
     */
     describe('Initial Signaling', () => {
       describe('Connect [Server → Initiator]', () => {
-        it('Should initiate socket connection', async (done) => {
-          let message = CryptoUtils.generateRandomMessage()
-          let options = {
-            query: {
-              stage: stages.initiator,
-              signed: signed,
-              message: message,
-              connId: connId
-            }
+        const message = CryptoUtils.generateRandomMessage()
+        const connectionOptions = {
+          query: {
+            stage: stages.initiator,
+            signed: signed,
+            message: message, // NOTE: Doesn't seem to be needed...
+            connId: connId
           }
-          initiator.socket = await connect(options)
-          initiator.socket.on(signals.initiated, async (data) => {
-            done()
+        }
+
+        describe('<Fail>', () => {
+          it('Should not connect with invalid @stage property', async (done) => {
+            let options = _.cloneDeep(connectionOptions)
+            options.query.stage = 'invalid'
+            initiator.socket = await connect(options)
+
+            // Succeed after 2 second timeout delay (no successful connection) //
+            setTimeout(() => {
+              done()
+            }, process.env.CONNECTION_TIMEOUT)
+
+            // Fail on signal that would mean success //
+            initiator.socket.on(signals.initiated, async (data) => {
+              throw new Error('Connected without stage property')
+            })
+          })
+          it('Should not connect with invalid @connId property', async (done) => {
+            let options = _.cloneDeep(connectionOptions)
+            options.query.connId = 'invalid'
+            initiator.socket = await connect(options)
+
+            // Succeed after 2 second timeout delay (no successful connection) //
+            setTimeout(() => {
+              done()
+            }, process.env.CONNECTION_TIMEOUT)
+
+            // Fail on signal that would mean success //
+            initiator.socket.on(signals.initiated, async (data) => {
+              throw new Error('Connected with invalid connId property')
+            })
+          })
+          it('Should not connect with missing @signed property', async (done) => {
+            let options = _.cloneDeep(connectionOptions)
+            delete options.query.signed
+            initiator.socket = await connect(options)
+
+            // Succeed after 2 second timeout delay (no successful connection) //
+            setTimeout(() => {
+              done()
+            }, process.env.CONNECTION_TIMEOUT)
+
+            // Fail on signal that would mean success //
+            initiator.socket.on(signals.initiated, async (data) => {
+              throw new Error('Connected with missing signed property')
+            })
+          })
+        })
+
+        describe('<Success>', () => {
+          it('Should initiate socket connection', async (done) => {
+            let message = CryptoUtils.generateRandomMessage()
+            let options = {
+              query: {
+                stage: stages.initiator,
+                signed: signed,
+                message: message,
+                connId: connId
+              }
+            }
+            initiator.socket = await connect(options)
+            initiator.socket.on(signals.initiated, async (data) => {
+              done()
+            })
           })
         })
       })
 
       describe('Handshake [Server → Receiver]', () => {
-        it('Should initiate socket connection with credentials created by initiator', async (done) => {
-          let options = {
-            query: {
-              stage: stages.receiver,
-              signed: signed,
-              connId: connId
-            }
+        const connectionOptions = {
+          query: {
+            stage: stages.receiver,
+            signed: signed,
+            connId: connId
           }
-          receiver.socket = await connect(options)
-          receiver.socket.on(signals.handshake, data => {
-            expect(data).toHaveProperty('toSign')
-            done()
+        }
+
+        describe('<Fail>', () => {
+          it('Should not connect with invalid @stage property', async (done) => {
+            let options = _.cloneDeep(connectionOptions)
+            options.query.stage = 'invalid'
+            receiver.socket = await connect(options)
+
+            // Succeed after 2 second timeout delay (no successful connection) //
+            setTimeout(() => {
+              done()
+            }, process.env.CONNECTION_TIMEOUT)
+
+            // Fail on signal that would mean success //
+            receiver.socket.on(signals.handshake, async (data) => {
+              throw new Error('Connected without stage property')
+            })
+          })
+          it('Should not connect with invalid @connId property', async (done) => {
+            let options = _.cloneDeep(connectionOptions)
+            options.query.connId = 'invalid'
+            receiver.socket = await connect(options)
+
+            // Succeed after 2 second timeout delay (no successful connection) //
+            setTimeout(() => {
+              done()
+            }, process.env.CONNECTION_TIMEOUT)
+
+            // Fail on signal that would mean success //
+            receiver.socket.on(signals.handshake, async (data) => {
+              throw new Error('Connected with invalid connId property')
+            })
+          })
+          it('Should not connect with missing @signed property', async (done) => {
+            let options = _.cloneDeep(connectionOptions)
+            delete options.query.signed
+            receiver.socket = await connect(options)
+
+            // Succeed after 2 second timeout delay (no successful connection) //
+            setTimeout(() => {
+              done()
+            }, process.env.CONNECTION_TIMEOUT)
+
+            // Fail on signal that would mean success //
+            receiver.socket.on(signals.handshake, async (data) => {
+              throw new Error('Connected with missing signed property')
+            })
+          })
+        })
+
+        describe('<Success>', () => {
+          it('Should initiate socket connection with credentials created by initiator', async (done) => {
+            let options = {
+              query: {
+                stage: stages.receiver,
+                signed: signed,
+                connId: connId
+              }
+            }
+            receiver.socket = await connect(options)
+            receiver.socket.on(signals.handshake, data => {
+              expect(data).toHaveProperty('toSign')
+              done()
+            })
           })
         })
       })

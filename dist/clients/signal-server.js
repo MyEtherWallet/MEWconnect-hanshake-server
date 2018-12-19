@@ -157,7 +157,14 @@ var SignalServer = function () {
         var connId = token.connId || false;
 
         // ERROR: invalid connection id //
-        if (this.invalidHex(connId)) throw new Error('Connection attempted to pass an invalid connection ID');
+        /**
+         * Todo: doesn't check for proper connId, can add random strings
+         */
+        if (this.invalidHex(connId)) {
+          socket.emit(_config.signals.error, { msg: 'Connection attempted to pass an invalid connection ID' });
+          socket.disconnect(true);
+          throw new Error('Connection attempted to pass an invalid connection ID');
+        }
 
         // Handle connection based on stage provided by token //
         switch (stage) {
@@ -244,6 +251,9 @@ var SignalServer = function () {
   }, {
     key: 'initiatorIncomming',
     value: function initiatorIncomming(socket, details) {
+      /**
+       * TODO: Add property check
+       */
       try {
         initiatorLog('INITIATOR CONNECTION with connection ID: ' + details.connId);
         extraverbose('Initiator details: ', details);

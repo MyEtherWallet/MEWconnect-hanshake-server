@@ -20,7 +20,8 @@ const signals = {
   invalidConnection: 'InvalidConnection',
   confirmationFailedBusy: 'confirmationFailedBusy',
   confirmationFailed: 'confirmationFailed',
-  receivedSignal: 'receivedSignal'
+  receivedSignal: 'receivedSignal',
+  'error': 'error'
 }
 
 const stages = {
