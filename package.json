@@ -50,6 +50,7 @@
     "ethereumjs-util": "^5.2.0",
     "jest": "^23.6.0",
     "mocha": "^5.2.0",
+    "prettier": "^1.15.3",
     "regenerator-runtime": "^0.13.1",
     "secp256k1": "^3.5.2",
     "simple-peer": "^9.2.0",
