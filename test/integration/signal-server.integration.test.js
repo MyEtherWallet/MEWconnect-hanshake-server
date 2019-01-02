@@ -79,6 +79,7 @@ let publicKey
 let privateKey
 let connId
 let signed
+let versionObject
 const version = '0.0.1'
 
 // Initiatior Object //
@@ -192,6 +193,7 @@ describe('Signal Server', () => {
       privateKey = keys.privateKey
       connId = CryptoUtils.generateConnId(publicKey)
       signed = CryptoUtils.signMessage(privateKey, privateKey)
+      versionObject = await CryptoUtils.encrypt(version, privateKey)
 
       done()
     })
@@ -209,11 +211,11 @@ describe('Signal Server', () => {
     /**
      * After all tests are completed, close socket connections.
      */
-    afterAll(async done => {
-      await disconnect(initiator.socket)
-      await disconnect(receiver.socket)
-      done()
-    })
+    // afterAll(async done => {
+    //   await disconnect(initiator.socket)
+    //   await disconnect(receiver.socket)
+    //   done()
+    // })
 
     /*
     ===================================================================================
@@ -227,15 +229,20 @@ describe('Signal Server', () => {
       ===================================================================================
       */
       describe('Connect [Server → Initiator]', () => {
-        const message = CryptoUtils.generateRandomMessage()
-        const connectionOptions = {
-          query: {
-            stage: stages.initiator,
-            signed: signed,
-            message: message, // NOTE: Doesn't seem to be needed...
-            connId: connId
+        let message
+        let connectionOptions
+
+        beforeEach(() => {
+          message = CryptoUtils.generateRandomMessage()
+          connectionOptions = {
+            query: {
+              stage: stages.initiator,
+              signed: signed,
+              message: message, // NOTE: Doesn't seem to be needed...
+              connId: connId
+            }
           }
-        }
+        })
 
         /*
         ===================================================================================
@@ -243,6 +250,19 @@ describe('Signal Server', () => {
         ===================================================================================
         */
         describe('<Fail>', () => {
+          it('Should not connect with missing @stage property', async done => {
+            let options = _.cloneDeep(connectionOptions)
+            delete options.query.stage
+            initiator.socket = await connect(options)
+
+            // Fail on signal that would indicate success //
+            initiator.socket.on(signals.initiated, async data => {
+              throw new Error('Connected with missing @stage property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
           it('Should not connect with invalid @stage property', async done => {
             let options = _.cloneDeep(connectionOptions)
             options.query.stage = 'invalid'
@@ -250,7 +270,20 @@ describe('Signal Server', () => {
 
             // Fail on signal that would indicate success //
             initiator.socket.on(signals.initiated, async data => {
-              throw new Error('Connected without @stage property')
+              throw new Error('Connected with invalid @stage property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
+          it('Should not connect with missing @connId property', async done => {
+            let options = _.cloneDeep(connectionOptions)
+            delete options.query.connId
+            initiator.socket = await connect(options)
+
+            // Fail on signal that would indicate success //
+            initiator.socket.on(signals.initiated, async data => {
+              throw new Error('Connected with invalid @connId property')
             })
 
             // Pass after timeout //
@@ -302,6 +335,7 @@ describe('Signal Server', () => {
             }
             initiator.socket = await connect(options)
             initiator.socket.on(signals.initiated, async data => {
+              console.log('Initiate success', initiator.socket.id)
               done()
             })
           })
@@ -314,13 +348,17 @@ describe('Signal Server', () => {
       ===================================================================================
       */
       describe('Handshake [Server → Receiver]', () => {
-        const connectionOptions = {
-          query: {
-            stage: stages.receiver,
-            signed: signed,
-            connId: connId
+        let connectionOptions
+
+        beforeEach(() => {
+          connectionOptions = {
+            query: {
+              stage: stages.receiver,
+              signed: signed,
+              connId: connId
+            }
           }
-        }
+        })
 
         /*
         ===================================================================================
@@ -328,6 +366,19 @@ describe('Signal Server', () => {
         ===================================================================================
         */
         describe('<Fail>', () => {
+          it('Should not connect with missing @stage property', async done => {
+            let options = _.cloneDeep(connectionOptions)
+            delete options.query.stage
+            receiver.socket = await connect(options)
+
+            // Fail on signal that would indicate success //
+            receiver.socket.on(signals.handshake, async data => {
+              throw new Error('Connected with missing @stage property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
           it('Should not connect with invalid @stage property', async done => {
             let options = _.cloneDeep(connectionOptions)
             options.query.stage = 'invalid'
@@ -335,7 +386,20 @@ describe('Signal Server', () => {
 
             // Fail on signal that would indicate success //
             receiver.socket.on(signals.handshake, async data => {
-              throw new Error('Connected without @stage property')
+              throw new Error('Connected with invalid @stage property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
+          it('Should not connect with missing @connId property', async done => {
+            let options = _.cloneDeep(connectionOptions)
+            delete options.query.connId
+            receiver.socket = await connect(options)
+
+            // Fail on signal that would indicate success //
+            receiver.socket.on(signals.initiated, async data => {
+              throw new Error('Connected with missing @connId property')
             })
 
             // Pass after timeout //
@@ -376,13 +440,8 @@ describe('Signal Server', () => {
         */
         describe('<Success>', () => {
           it('Should initiate socket connection with credentials supplied by initiator', async done => {
-            let options = {
-              query: {
-                stage: stages.receiver,
-                signed: signed,
-                connId: connId
-              }
-            }
+            let options = _.cloneDeep(connectionOptions)
+
             receiver.socket = await connect(options)
             receiver.socket.on(signals.handshake, data => {
               expect(data).toHaveProperty('toSign')
@@ -398,6 +457,15 @@ describe('Signal Server', () => {
       ===================================================================================
       */
       describe('Signature [Receiver → Server]', () => {
+        let signaturePayload
+
+        beforeEach(() => {
+          signaturePayload = {
+            signed: signed,
+            connId: connId,
+            version: versionObject
+          }
+        })
         /*
         ===================================================================================
           2a-3. Pairing -> Initial Signaling -> Signature [Receiver → Server] -> FAIL
@@ -405,29 +473,9 @@ describe('Signal Server', () => {
         */
         describe('<Fail>', () => {
           it('Should not connect with missing @signed property', async done => {
-            let versionObject = await CryptoUtils.encrypt(version, privateKey)
-            receiver.socket.binary(false).emit(signals.signature, {
-              signed: 'invalid',
-              connId: connId,
-              version: versionObject
-            })
-
-            // Fail on signal that would indicate success //
-            receiver.socket.on(signals.receivedSignal, async data => {
-              throw new Error('Connected with invalid @signed property')
-            })
-
-            // Pass after timeout //
-            pass(done)
-          })
-
-          it('Should not connect with invalid @signed property', async done => {
-            let versionObject = await CryptoUtils.encrypt(version, privateKey)
-            receiver.socket.binary(false).emit(signals.signature, {
-              // signed: signed,
-              connId: connId,
-              version: versionObject
-            })
+            let payload = _.cloneDeep(signaturePayload)
+            delete payload.signed
+            receiver.socket.binary(false).emit(signals.signature, payload)
 
             // Fail on signal that would indicate success //
             receiver.socket.on(signals.receivedSignal, async data => {
@@ -437,14 +485,10 @@ describe('Signal Server', () => {
             // Pass after timeout //
             pass(done)
           })
-
           it('Should not connect with missing @connId property', async done => {
-            let versionObject = await CryptoUtils.encrypt(version, privateKey)
-            receiver.socket.binary(false).emit(signals.signature, {
-              signed: signed,
-              // connId: connId,
-              version: versionObject
-            })
+            let payload = _.cloneDeep(signaturePayload)
+            delete payload.connId
+            receiver.socket.binary(false).emit(signals.signature, payload)
 
             // Fail on signal that would indicate success //
             receiver.socket.on(signals.receivedSignal, async data => {
@@ -454,14 +498,10 @@ describe('Signal Server', () => {
             // Pass after timeout //
             pass(done)
           })
-
           it('Should not connect with invalid @connId property', async done => {
-            let versionObject = await CryptoUtils.encrypt(version, privateKey)
-            receiver.socket.binary(false).emit(signals.signature, {
-              signed: signed,
-              connId: 'invalid',
-              version: versionObject
-            })
+            let payload = _.cloneDeep(signaturePayload)
+            payload.connId = 'invalid'
+            receiver.socket.binary(false).emit(signals.signature, payload)
 
             // Fail on signal that would indicate success //
             receiver.socket.on(signals.receivedSignal, async data => {
@@ -471,13 +511,10 @@ describe('Signal Server', () => {
             // Pass after timeout //
             pass(done)
           })
-
           it('Should not connect with missing @version property', async done => {
-            receiver.socket.binary(false).emit(signals.signature, {
-              signed: signed,
-              connId: connId
-              // version: versionObject
-            })
+            let payload = _.cloneDeep(signaturePayload)
+            delete payload.version
+            receiver.socket.binary(false).emit(signals.signature, payload)
 
             // Fail on signal that would indicate success //
             receiver.socket.on(signals.receivedSignal, async data => {
@@ -487,13 +524,10 @@ describe('Signal Server', () => {
             // Pass after timeout //
             pass(done)
           })
-
           it('Should not connect with invalid @version property', async done => {
-            receiver.socket.binary(false).emit(signals.signature, {
-              signed: signed,
-              connId: connId,
-              version: 'invalid'
-            })
+            let payload = _.cloneDeep(signaturePayload)
+            payload.version = 'invalid'
+            receiver.socket.binary(false).emit(signals.signature, payload)
 
             // Fail on signal that would indicate success //
             receiver.socket.on(signals.receivedSignal, async data => {
@@ -512,12 +546,9 @@ describe('Signal Server', () => {
         */
         describe('<Success>', () => {
           it('Should sign with identity credentials supplied to server for validation against credentials initially supplied to the server by the initiator', async done => {
-            let versionObject = await CryptoUtils.encrypt(version, privateKey)
-            receiver.socket.binary(false).emit(signals.signature, {
-              signed: signed,
-              connId: connId,
-              version: versionObject
-            })
+            let payload = _.cloneDeep(signaturePayload)
+            receiver.socket.binary(false).emit(signals.signature, payload)
+
             receiver.socket.on(signals.receivedSignal, signal => {
               expect(signal).toMatch(signals.signature)
               done()
@@ -815,13 +846,13 @@ describe('Signal Server', () => {
     describe('RTC Connection', () => {
       /*
         ===================================================================================
-          2d. Pairing -> RTC Connection -> RTC Connection [Initiator & Receiver]
+          2d-1. Pairing -> RTC Connection -> RTC Connection [Initiator & Receiver]
         ===================================================================================
       */
       describe('RTC Connection [Initiator & Receiver] ', () => {
         /*
           ===================================================================================
-            2d. Pairing -> RTC Connection -> RTC Connection [Initiator & Receiver] -> SUCCESS
+            2d-1. Pairing -> RTC Connection -> RTC Connection [Initiator & Receiver] -> SUCCESS
           ===================================================================================
         */
         describe('<SUCCESS>', () => {
@@ -861,13 +892,13 @@ describe('Signal Server', () => {
 
       /*
         ===================================================================================
-          2d. Pairing -> RTC Connection -> RtcConnected [Initiator → Server]
+          2d-2. Pairing -> RTC Connection -> RtcConnected [Initiator → Server]
         ===================================================================================
       */
       describe('RtcConnected [Initiator → Server]', () => {
         /*
           ===================================================================================
-            2d. Pairing -> RTC Connection -> RtcConnected [Initiator → Server] -> SUCCESS
+            2d-2. Pairing -> RTC Connection -> RtcConnected [Initiator → Server] -> SUCCESS
           ===================================================================================
         */
         describe('<SUCCESS>', () => {
@@ -883,13 +914,13 @@ describe('Signal Server', () => {
 
       /*
         ===================================================================================
-          2d. Pairing -> RTC Connection -> RtcConnected [Receiver → Server]
+          2d-3. Pairing -> RTC Connection -> RtcConnected [Receiver → Server]
         ===================================================================================
       */
       describe('RtcConnected [Receiver → Server]', () => {
         /*
           ===================================================================================
-            2d. Pairing -> RTC Connection -> RtcConnected [Receiver → Server] -> SUCCESS
+            2d-3. Pairing -> RTC Connection -> RtcConnected [Receiver → Server] -> SUCCESS
           ===================================================================================
         */
         describe('<SUCCESS>', () => {

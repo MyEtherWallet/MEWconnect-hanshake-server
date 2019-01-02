@@ -115,15 +115,16 @@ export default class SignalServer {
       const stage = token.stage || false
       const connId = token.connId || false
 
+
       // ERROR: invalid connection id //
       /**
        * Todo: doesn't check for proper connId, can add random strings
        */
-      if (this.invalidHex(connId)) {
-        socket.emit(signals.error, {
-          msg: 'Connection attempted to pass an invalid connection ID'
-        })
-        socket.disconnect(true)
+      if (this.invalidConnId(connId)) {
+        // socket.emit(signals.error, {
+        //   msg: 'Connection attempted to pass an invalid connection ID'
+        // })
+        // socket.disconnect(true)
         throw new Error('Connection attempted to pass an invalid connection ID')
       }
 
@@ -191,8 +192,16 @@ export default class SignalServer {
     }
   }
 
+  invalidConnId (hex) {
+    let validHex = /[0-9A-Fa-f].*/.test(hex)
+    let validLength = (hex.length === 32)
+    let result = !(validHex && validLength)
+    return result
+  }
+
   invalidHex (hex) {
-    return !/[0-9A-Fa-f].*/.test(hex)
+    let validHex = /[0-9A-Fa-f].*/.test(hex)
+    return !validHex
   }
 
   //////////////////////////////
@@ -218,8 +227,7 @@ export default class SignalServer {
     try {
       initiatorLog(`INITIATOR CONNECTION with connection ID: ${details.connId}`)
       extraverbose('Initiator details: ', details)
-      if (this.invalidHex(socket.id))
-        throw new Error('Connection attempted to pass an invalid socket ID')
+      if (this.invalidHex(socket.id)) throw new Error('Connection attempted to pass an invalid socket ID')
       this.redis.createConnectionEntry(details, socket.id).then(() => {
         socket.join(details.connId)
         socket.emit(signals.initiated, details)
@@ -232,7 +240,7 @@ export default class SignalServer {
   receiverIncomming(socket, details) {
     try {
       receiverLog(`RECEIVER CONNECTION for ${details.connId}`)
-      if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID')
+      if (this.invalidConnId(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID')
       this.redis.locateMatchingConnection(details.connId).then(_result => {
         if (_result) {
           verbose(_result)
@@ -252,7 +260,7 @@ export default class SignalServer {
   receiverConfirm(socket, details) {
     try {
       receiverLog('RECEIVER CONFIRM: ', details.connId)
-      if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID')
+      if (this.invalidConnId(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID')
       this.redis
         .locateMatchingConnection(details.connId)
         .then(_result => {
@@ -276,7 +284,7 @@ export default class SignalServer {
                         receiverLog(
                           `Updated connection entry for ${details.connId}`
                         )
-                        socket.to(details.connId).emit(signals.confirmation, {
+                        this.io.to(details.connId).emit(signals.confirmation, {
                           connId: details.connId,
                           version: details.version
                         })

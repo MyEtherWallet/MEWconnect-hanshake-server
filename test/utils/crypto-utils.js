@@ -25,7 +25,7 @@ export default (() => {
    * @return {String} - connId string
    */
   const generateConnId = publicKey => {
-    return publicKey.toString('hex').slice(32)
+    return publicKey.toString('hex').slice(-32)
   }
 
   /**

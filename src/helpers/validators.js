@@ -138,7 +138,7 @@ const tryTurnValidator = new Schema({
   }
 })
 
-export default function isValid(message) {
+export default function isValid (message) {
   return new Promise((resolve, reject) => {
     let errors
     if (wholeEncrypted.includes(message[0])) {
@@ -150,8 +150,11 @@ export default function isValid(message) {
     } else if (message[0] === tryTurn) {
       errors = tryTurnValidator.validate(message[1])
     } else {
+      console.log('reject')
       reject()
     }
+
+    console.log(errors)
 
     if (message[1].options !== undefined && message[1].options !== null) {
       if (!optionsCheck(message[1].options)) {

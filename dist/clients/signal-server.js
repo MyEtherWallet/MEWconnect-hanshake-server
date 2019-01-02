@@ -1,7 +1,6 @@
 'use strict';
 
 // Import //
-// todo look into refactoring to accept plug-in testing data, and/or testing tools
 
 Object.defineProperty(exports, "__esModule", {
   value: true
@@ -11,10 +10,6 @@ var _createClass = function () { function defineProperties(target, props) { for 
 
 // Lib //
 
-
-var _logging = require('logging');
-
-var _logging2 = _interopRequireDefault(_logging);
 
 var _debug = require('debug');
 
@@ -27,6 +22,10 @@ var _dotenv2 = _interopRequireDefault(_dotenv);
 var _http = require('http');
 
 var _http2 = _interopRequireDefault(_http);
+
+var _logging = require('logging');
+
+var _logging2 = _interopRequireDefault(_logging);
 
 var _util = require('util');
 
@@ -160,11 +159,11 @@ var SignalServer = function () {
         /**
          * Todo: doesn't check for proper connId, can add random strings
          */
-        if (this.invalidHex(connId)) {
-          socket.emit(_config.signals.error, {
-            msg: 'Connection attempted to pass an invalid connection ID'
-          });
-          socket.disconnect(true);
+        if (this.invalidConnId(connId)) {
+          // socket.emit(signals.error, {
+          //   msg: 'Connection attempted to pass an invalid connection ID'
+          // })
+          // socket.disconnect(true)
           throw new Error('Connection attempted to pass an invalid connection ID');
         }
 
@@ -228,9 +227,18 @@ var SignalServer = function () {
       }
     }
   }, {
+    key: 'invalidConnId',
+    value: function invalidConnId(hex) {
+      var validHex = /[0-9A-Fa-f].*/.test(hex);
+      var validLength = hex.length === 32;
+      var result = !(validHex && validLength);
+      return result;
+    }
+  }, {
     key: 'invalidHex',
     value: function invalidHex(hex) {
-      return !/[0-9A-Fa-f].*/.test(hex);
+      var validHex = /[0-9A-Fa-f].*/.test(hex);
+      return !validHex;
     }
 
     //////////////////////////////
@@ -276,7 +284,7 @@ var SignalServer = function () {
 
       try {
         receiverLog('RECEIVER CONNECTION for ' + details.connId);
-        if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
+        if (this.invalidConnId(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
         this.redis.locateMatchingConnection(details.connId).then(function (_result) {
           if (_result) {
             verbose(_result);
@@ -299,7 +307,7 @@ var SignalServer = function () {
 
       try {
         receiverLog('RECEIVER CONFIRM: ', details.connId);
-        if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
+        if (this.invalidConnId(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
         this.redis.locateMatchingConnection(details.connId).then(function (_result) {
           receiverLog('Located Matching Connection for ' + details.connId);
           verbose(_result);
@@ -311,7 +319,7 @@ var SignalServer = function () {
                 _this3.redis.updateConnectionEntry(details.connId, socket.id).then(function (_result) {
                   if (_result) {
                     receiverLog('Updated connection entry for ' + details.connId);
-                    socket.to(details.connId).emit(_config.signals.confirmation, {
+                    _this3.io.to(details.connId).emit(_config.signals.confirmation, {
                       connId: details.connId,
                       version: details.version
                     });
