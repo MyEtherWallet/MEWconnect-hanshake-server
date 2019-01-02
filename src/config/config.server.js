@@ -5,6 +5,4 @@ const serverConfig = {
   port: process.env.PORT || 8080
 }
 
-export {
-  serverConfig
-}
+export { serverConfig }

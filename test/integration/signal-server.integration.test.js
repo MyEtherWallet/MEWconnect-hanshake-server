@@ -64,7 +64,7 @@ const socketOptions = {
 }
 
 // WebRTC Variables //
-const stunServers = [ { urls: 'stun:global.stun.twilio.com:3478?transport=udp' } ]
+const stunServers = [{ urls: 'stun:global.stun.twilio.com:3478?transport=udp' }]
 const defaultWebRTCOptions = {
   trickle: false,
   iceTransportPolicy: 'relay',
@@ -98,7 +98,7 @@ let receiver = {
 }
 
 /*
-======================================================================
+=======================================================================
   Test "Member Functions"
 =======================================================================
 */
@@ -111,7 +111,10 @@ let receiver = {
 const connect = async (options = {}, namespace = '') => {
   try {
     let mergedOptions = _.merge(options, socketOptions)
-    let socketManager = SocketIOClient(`${serverAddress}/${namespace}`, mergedOptions)
+    let socketManager = SocketIOClient(
+      `${serverAddress}/${namespace}`,
+      mergedOptions
+    )
     let socket = await socketManager.connect()
     return socket
   } catch (e) {
@@ -123,18 +126,26 @@ const connect = async (options = {}, namespace = '') => {
  * Disconnect from a particular socket connection
  * @param  {Object} socket - An established socket connection with SignalServer
  */
-const disconnect = async (socket) => {
+const disconnect = async socket => {
   if (socket.connected) await socket.disconnect()
 }
 
+/**
+ * Set a timeout to perform callback after process.env.CONNECTION_TIMEOUT
+ * @param  {Function} done - Callback function to perform (usually passing a test)
+ */
+const pass = async done => {
+  setTimeout(done, process.env.CONNECTION_TIMEOUT)
+}
+
 /*
-======================================================================
+=======================================================================
   Test Start
 =======================================================================
 */
 describe('Signal Server', () => {
   /*
-  ======================================================================
+  =======================================================================
     1. Initialization
   =======================================================================
   */
@@ -161,7 +172,7 @@ describe('Signal Server', () => {
   })
 
   /*
-  ======================================================================
+  =======================================================================
     2. Pairing
   =======================================================================
   */
@@ -170,7 +181,7 @@ describe('Signal Server', () => {
      * Before all tests, get the SignalServer address and generate keys
      * used for communication.
      */
-    beforeAll(async (done) => {
+    beforeAll(async done => {
       // SignalServer Details //
       let address = signalServer.server.address()
       serverAddress = `http://${address.address}:${address.port}`
@@ -189,7 +200,7 @@ describe('Signal Server', () => {
      * After each test, stop listening to signals.receivedSignal event.
      * Each discrete test will listen to this event if need be.
      */
-    afterEach(async (done) => {
+    afterEach(async done => {
       if (initiator.socket.connected) await initiator.socket.off(signals.receivedSignal)
       if (receiver.socket.connected) await receiver.socket.off(signals.receivedSignal)
       done()
@@ -198,20 +209,20 @@ describe('Signal Server', () => {
     /**
      * After all tests are completed, close socket connections.
      */
-    afterAll(async (done) => {
+    afterAll(async done => {
       await disconnect(initiator.socket)
       await disconnect(receiver.socket)
       done()
     })
 
     /*
-    ======================================================================
+    =======================================================================
       2a. Pairing -> Initial Signaling
     =======================================================================
     */
     describe('Initial Signaling', () => {
       /*
-      ======================================================================
+      =======================================================================
         2a-1. Pairing -> Initial Signaling -> Connect [Server → Initiator]
       =======================================================================
       */
@@ -227,65 +238,59 @@ describe('Signal Server', () => {
         }
 
         /*
-        ======================================================================
+        =======================================================================
           2a-1. Pairing -> Initial Signaling -> Connect [Server → Initiator] -> FAIL
         =======================================================================
         */
         describe('<Fail>', () => {
-          it('Should not connect with invalid @stage property', async (done) => {
+          it('Should not connect with invalid @stage property', async done => {
             let options = _.cloneDeep(connectionOptions)
             options.query.stage = 'invalid'
             initiator.socket = await connect(options)
 
-            // Succeed after 2 second timeout delay (no successful connection) //
-            setTimeout(() => {
-              done()
-            }, process.env.CONNECTION_TIMEOUT)
-
-            // Fail on signal that would mean success //
-            initiator.socket.on(signals.initiated, async (data) => {
-              throw new Error('Connected without stage property')
+            // Fail on signal that would indicate success //
+            initiator.socket.on(signals.initiated, async data => {
+              throw new Error('Connected without @stage property')
             })
+
+            // Pass after timeout //
+            pass(done)
           })
-          it('Should not connect with invalid @connId property', async (done) => {
+          it('Should not connect with invalid @connId property', async done => {
             let options = _.cloneDeep(connectionOptions)
             options.query.connId = 'invalid'
             initiator.socket = await connect(options)
 
-            // Succeed after 2 second timeout delay (no successful connection) //
-            setTimeout(() => {
-              done()
-            }, process.env.CONNECTION_TIMEOUT)
-
-            // Fail on signal that would mean success //
-            initiator.socket.on(signals.initiated, async (data) => {
-              throw new Error('Connected with invalid connId property')
+            // Fail on signal that would indicate success //
+            initiator.socket.on(signals.initiated, async data => {
+              throw new Error('Connected with invalid @connId property')
             })
+
+            // Pass after timeout //
+            pass(done)
           })
-          it('Should not connect with missing @signed property', async (done) => {
+          it('Should not connect with missing @signed property', async done => {
             let options = _.cloneDeep(connectionOptions)
             delete options.query.signed
             initiator.socket = await connect(options)
 
-            // Succeed after 2 second timeout delay (no successful connection) //
-            setTimeout(() => {
-              done()
-            }, process.env.CONNECTION_TIMEOUT)
-
-            // Fail on signal that would mean success //
-            initiator.socket.on(signals.initiated, async (data) => {
-              throw new Error('Connected with missing signed property')
+            // Fail on signal that would indicate success //
+            initiator.socket.on(signals.initiated, async data => {
+              throw new Error('Connected with missing @signed property')
             })
+
+            // Pass after timeout //
+            pass(done)
           })
         })
 
         /*
-        ======================================================================
+        =======================================================================
           2a-1. Pairing -> Initial Signaling -> Connect [Server → Initiator] -> SUCCESS
         =======================================================================
         */
         describe('<Success>', () => {
-          it('Should initiate socket connection', async (done) => {
+          it('Should initiate socket connection', async done => {
             let message = CryptoUtils.generateRandomMessage()
             let options = {
               query: {
@@ -296,7 +301,7 @@ describe('Signal Server', () => {
               }
             }
             initiator.socket = await connect(options)
-            initiator.socket.on(signals.initiated, async (data) => {
+            initiator.socket.on(signals.initiated, async data => {
               done()
             })
           })
@@ -304,7 +309,7 @@ describe('Signal Server', () => {
       })
 
       /*
-      ======================================================================
+      =======================================================================
         2a-2. Pairing -> Initial Signaling -> Handshake [Server → Receiver]
       =======================================================================
       */
@@ -318,65 +323,59 @@ describe('Signal Server', () => {
         }
 
         /*
-        ======================================================================
+        =======================================================================
           2a-2. Pairing -> Initial Signaling -> Handshake [Server → Receiver] -> FAIL
         =======================================================================
         */
         describe('<Fail>', () => {
-          it('Should not connect with invalid @stage property', async (done) => {
+          it('Should not connect with invalid @stage property', async done => {
             let options = _.cloneDeep(connectionOptions)
             options.query.stage = 'invalid'
             receiver.socket = await connect(options)
 
-            // Succeed after 2 second timeout delay (no successful connection) //
-            setTimeout(() => {
-              done()
-            }, process.env.CONNECTION_TIMEOUT)
-
-            // Fail on signal that would mean success //
-            receiver.socket.on(signals.handshake, async (data) => {
-              throw new Error('Connected without stage property')
+            // Fail on signal that would indicate success //
+            receiver.socket.on(signals.handshake, async data => {
+              throw new Error('Connected without @stage property')
             })
+
+            // Pass after timeout //
+            pass(done)
           })
-          it('Should not connect with invalid @connId property', async (done) => {
+          it('Should not connect with invalid @connId property', async done => {
             let options = _.cloneDeep(connectionOptions)
             options.query.connId = 'invalid'
             receiver.socket = await connect(options)
 
-            // Succeed after 2 second timeout delay (no successful connection) //
-            setTimeout(() => {
-              done()
-            }, process.env.CONNECTION_TIMEOUT)
-
-            // Fail on signal that would mean success //
-            receiver.socket.on(signals.handshake, async (data) => {
-              throw new Error('Connected with invalid connId property')
+            // Fail on signal that would indicate success //
+            receiver.socket.on(signals.handshake, async data => {
+              throw new Error('Connected with invalid @connId property')
             })
+
+            // Pass after timeout //
+            pass(done)
           })
-          it('Should not connect with missing @signed property', async (done) => {
+          it('Should not connect with missing @signed property', async done => {
             let options = _.cloneDeep(connectionOptions)
             delete options.query.signed
             receiver.socket = await connect(options)
 
-            // Succeed after 2 second timeout delay (no successful connection) //
-            setTimeout(() => {
-              done()
-            }, process.env.CONNECTION_TIMEOUT)
-
-            // Fail on signal that would mean success //
-            receiver.socket.on(signals.handshake, async (data) => {
-              throw new Error('Connected with missing signed property')
+            // Fail on signal that would indicate success //
+            receiver.socket.on(signals.handshake, async data => {
+              throw new Error('Connected with missing @signed property')
             })
+
+            // Pass after timeout //
+            pass(done)
           })
         })
 
         /*
-        ======================================================================
+        =======================================================================
           2a-2. Pairing -> Initial Signaling -> Handshake [Server → Receiver] -> SUCCESS
         =======================================================================
         */
         describe('<Success>', () => {
-          it('Should initiate socket connection with credentials supplied by initiator', async (done) => {
+          it('Should initiate socket connection with credentials supplied by initiator', async done => {
             let options = {
               query: {
                 stage: stages.receiver,
@@ -394,144 +393,415 @@ describe('Signal Server', () => {
       })
 
       /*
-      ======================================================================
+      =======================================================================
         2a-3. Pairing -> Initial Signaling -> Signature [Receiver → Server]
       =======================================================================
       */
       describe('Signature [Receiver → Server]', () => {
-        it('Should sign with identity credentials supplied to server for validation against credentials initially supplied to the server by the initiator', async (done) => {
-          let versionObject = await CryptoUtils.encrypt(version, privateKey)
-          receiver.socket.binary(false).emit(signals.signature, {
-            signed: signed,
-            connId: connId,
-            version: versionObject
-          })
-          receiver.socket.on(signals.receivedSignal, signal => {
-            expect(signal).toMatch(signals.signature)
-            done()
-          })
-        })
-      })
-
-      describe('Confirmation [Server → Initiator] (', () => {
-        it('Should receive confirmation of receiver identity made by the server and initialization of RTC my be attempted', async (done) => {
-          initiator.socket.on(signals.confirmation, data => {
-            initiator.version = data.version
-            expect(data).toHaveProperty('connId')
-            expect(data).toHaveProperty('version')
-            let expectedVersionProperties = ['ciphertext', 'ephemPublicKey', 'iv', 'mac']
-            expect(Object.keys(data.version)).toEqual(expect.arrayContaining(expectedVersionProperties))
-            done()
-          })
-        })
-      })
-    })
-
-    /*
-      ======================================================================
-      2b. Pairing -> Offer Creation
-      =======================================================================
-    */
-    describe('Offer Creation', () => {
-      describe('OfferSignal [Initiator → Server]', () => {
-        it('Should send an offer and server list to the SignalServer for retransmission to the receiver', async (done) => {
-          // Add initiator property to default options //
-          let webRTCOptions = {
-            initiator: true,
-            ...defaultWebRTCOptions
-          }
-
-          // Create initiator WebRTC peer //
-          initiator.peer = new Peer(webRTCOptions)
-          initiator.peer.on(rtcSignals.signal, async (data) => {
-            expect(data).toHaveProperty('type')
-            expect(data).toHaveProperty('sdp')
-
-            // Send WebRTC offer as encrypted string //
-            let encryptedSend = await CryptoUtils.encrypt(JSON.stringify(data), privateKey)
-
-            // Emit offer signal for receiver //
-            initiator.socket.binary(false).emit(signals.offerSignal, {
-              data: encryptedSend,
+        /*
+        =======================================================================
+          2a-3. Pairing -> Initial Signaling -> Signature [Receiver → Server] -> FAIL
+        =======================================================================
+        */
+        describe('<Fail>', () => {
+          it('Should not connect with missing @signed property', async done => {
+            let versionObject = await CryptoUtils.encrypt(version, privateKey)
+            receiver.socket.binary(false).emit(signals.signature, {
+              signed: 'invalid',
               connId: connId,
-              options: stunServers
+              version: versionObject
             })
 
-            // Listen for confirmation SignalServer received signal //
-            initiator.socket.on(signals.receivedSignal, signal => {
-              expect(signal).toMatch(signals.offerSignal)
+            // Fail on signal that would indicate success //
+            receiver.socket.on(signals.receivedSignal, async data => {
+              throw new Error('Connected with invalid @signed property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
+
+          it('Should not connect with invalid @signed property', async done => {
+            let versionObject = await CryptoUtils.encrypt(version, privateKey)
+            receiver.socket.binary(false).emit(signals.signature, {
+              // signed: signed,
+              connId: connId,
+              version: versionObject
+            })
+
+            // Fail on signal that would indicate success //
+            receiver.socket.on(signals.receivedSignal, async data => {
+              throw new Error('Connected with missing @signed property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
+
+          it('Should not connect with missing @connId property', async done => {
+            let versionObject = await CryptoUtils.encrypt(version, privateKey)
+            receiver.socket.binary(false).emit(signals.signature, {
+              signed: signed,
+              // connId: connId,
+              version: versionObject
+            })
+
+            // Fail on signal that would indicate success //
+            receiver.socket.on(signals.receivedSignal, async data => {
+              throw new Error('Connected with missing @connId property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
+
+          it('Should not connect with invalid @connId property', async done => {
+            let versionObject = await CryptoUtils.encrypt(version, privateKey)
+            receiver.socket.binary(false).emit(signals.signature, {
+              signed: signed,
+              connId: 'invalid',
+              version: versionObject
+            })
+
+            // Fail on signal that would indicate success //
+            receiver.socket.on(signals.receivedSignal, async data => {
+              throw new Error('Connected with invalid @connId property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
+
+          it('Should not connect with missing @version property', async done => {
+            receiver.socket.binary(false).emit(signals.signature, {
+              signed: signed,
+              connId: connId
+              // version: versionObject
+            })
+
+            // Fail on signal that would indicate success //
+            receiver.socket.on(signals.receivedSignal, async data => {
+              throw new Error('Connected with missing @version property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
+
+          it('Should not connect with invalid @version property', async done => {
+            receiver.socket.binary(false).emit(signals.signature, {
+              signed: signed,
+              connId: connId,
+              version: 'invalid'
+            })
+
+            // Fail on signal that would indicate success //
+            receiver.socket.on(signals.receivedSignal, async data => {
+              throw new Error('Connected with invalid @version property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
+        })
+
+        /*
+        =======================================================================
+          2a-3. Pairing -> Initial Signaling -> Signature [Receiver → Server] -> SUCCESS
+        =======================================================================
+        */
+        describe('<Success>', () => {
+          it('Should sign with identity credentials supplied to server for validation against credentials initially supplied to the server by the initiator', async done => {
+            let versionObject = await CryptoUtils.encrypt(version, privateKey)
+            receiver.socket.binary(false).emit(signals.signature, {
+              signed: signed,
+              connId: connId,
+              version: versionObject
+            })
+            receiver.socket.on(signals.receivedSignal, signal => {
+              expect(signal).toMatch(signals.signature)
               done()
             })
           })
         })
       })
 
-      describe('Offer [Server → Receiver] ', () => {
-        it('Should receive retransmission of the offer and server list from the initiator', async (done) => {
-          receiver.socket.on(signals.offer, async (data) => {
-            let decryptedMessage = await CryptoUtils.decrypt(data.data, privateKey)
-
-            // Parse offer //
-            receiver.offer = JSON.parse(decryptedMessage)
-            let expectedVersionProperties = ['type', 'sdp']
-            expect(Object.keys(receiver.offer)).toEqual(expect.arrayContaining(expectedVersionProperties))
-            done()
+      /*
+      =======================================================================
+        2a-4. Pairing -> Initial Signaling -> Confirmation [Server → Initiator]
+      =======================================================================
+      */
+      describe('Confirmation [Server → Initiator]', () => {
+        /*
+        =======================================================================
+          2a-4. Pairing -> Initial Signaling -> Confirmation [Server → Initiator] -> SUCCESS
+        =======================================================================
+        */
+        describe('<SUCCESS>', () => {
+          it('Should receive confirmation of receiver identity made by the server and initialization of RTC my be attempted', async done => {
+            initiator.socket.on(signals.confirmation, data => {
+              initiator.version = data.version
+              expect(data).toHaveProperty('connId')
+              expect(data).toHaveProperty('version')
+              let expectedVersionProperties = [
+                'ciphertext',
+                'ephemPublicKey',
+                'iv',
+                'mac'
+              ]
+              expect(Object.keys(data.version)).toEqual(
+                expect.arrayContaining(expectedVersionProperties)
+              )
+              done()
+            })
           })
         })
       })
     })
 
     /*
-      ======================================================================
-      2c. Pairing -> Answer Creation
+      =======================================================================
+        2b. Pairing -> Offer Creation
+      =======================================================================
+    */
+    describe('Offer Creation', () => {
+      /*
+        =======================================================================
+          2b-1. Pairing -> Offer Creation -> OfferSignal [Initiator → Server]
+        =======================================================================
+      */
+      describe('OfferSignal [Initiator → Server]', () => {
+        /*
+          =======================================================================
+            2b-1. Pairing -> Offer Creation -> OfferSignal [Initiator → Server] -> SUCCESS
+          =======================================================================
+        */
+        describe('<SUCCESS>', () => {
+          it('Should send an offer and server list to the SignalServer for retransmission to the receiver', async done => {
+            // Add initiator property to default options //
+            let webRTCOptions = {
+              initiator: true,
+              ...defaultWebRTCOptions
+            }
+
+            // Create initiator WebRTC peer //
+            initiator.peer = new Peer(webRTCOptions)
+            initiator.peer.on(rtcSignals.signal, async data => {
+              expect(data).toHaveProperty('type')
+              expect(data).toHaveProperty('sdp')
+
+              // Send WebRTC offer as encrypted string //
+              let encryptedSend = await CryptoUtils.encrypt(
+                JSON.stringify(data),
+                privateKey
+              )
+
+              // Emit offer signal for receiver //
+              initiator.socket.binary(false).emit(signals.offerSignal, {
+                data: encryptedSend,
+                connId: connId,
+                options: stunServers
+              })
+
+              // Listen for confirmation SignalServer received signal //
+              initiator.socket.on(signals.receivedSignal, signal => {
+                expect(signal).toMatch(signals.offerSignal)
+                done()
+              })
+            })
+          })
+        })
+      })
+
+      /*
+        =======================================================================
+          2b-2. Pairing -> Offer Creation -> Offer [Server → Receiver]
+        =======================================================================
+      */
+      describe('Offer [Server → Receiver] ', () => {
+        /*
+          =======================================================================
+            2b-2. Pairing -> Offer Creation -> Offer [Server → Receiver] -> SUCCESS
+          =======================================================================
+        */
+        describe('<SUCCESS>', () => {
+          it('Should receive retransmission of the offer and server list from the initiator', async done => {
+            receiver.socket.on(signals.offer, async data => {
+              let decryptedMessage = await CryptoUtils.decrypt(
+                data.data,
+                privateKey
+              )
+
+              // Parse offer //
+              receiver.offer = JSON.parse(decryptedMessage)
+              let expectedVersionProperties = ['type', 'sdp']
+              expect(Object.keys(receiver.offer)).toEqual(
+                expect.arrayContaining(expectedVersionProperties)
+              )
+              done()
+            })
+          })
+        })
+      })
+    })
+
+    /*
+      =======================================================================
+        2c. Pairing -> Answer Creation
       =======================================================================
     */
     describe('Answer Creation', () => {
+      const webRTCOptions = {
+        ...defaultWebRTCOptions
+      }
+
+      /*
+        =======================================================================
+          2c-1. Pairing -> Answer Creation -> AnswerSignal [Receiver → Server]
+        =======================================================================
+      */
       describe('AnswerSignal [Receiver → Server]', () => {
-        it('Should transmit an answer to the received offer for retransmission to the initiator', async (done) => {
-          // Default webRTC options -- not the initiator //
-          let webRTCOptions = {
-            ...defaultWebRTCOptions
-          }
-
-          // Create Receiver WebRTC peer //
-          receiver.peer = new Peer(webRTCOptions)
-          receiver.peer.signal(receiver.offer)
-          receiver.peer.on(rtcSignals.signal, async (data) => {
-            expect(data).toHaveProperty('type')
-            expect(data).toHaveProperty('sdp')
-
-            // Send WebRTC offer as encrypted string //
-            let encryptedSend = await CryptoUtils.encrypt(JSON.stringify(data), privateKey)
-
+        /*
+          =======================================================================
+            2c-1. Pairing -> Answer Creation -> AnswerSignal [Receiver → Server] -> FAIL
+          =======================================================================
+        */
+        describe('<FAIL>', () => {
+          it('Should not connect with missing @data property', async done => {
             // Emit offer signal for receiver //
             receiver.socket.binary(false).emit(signals.answerSignal, {
-              data: encryptedSend,
+              // data: encryptedSend,
               connId: connId
             })
 
             // Listen for confirmation SignalServer received signal //
             receiver.socket.on(signals.receivedSignal, signal => {
-              expect(signal).toMatch(signals.answerSignal)
-              done()
+              throw new Error('Connected with missing @data property')
             })
+
+            // Pass after timeout //
+            pass(done)
           })
 
-          receiver.peer.on(rtcSignals.error, async (data) => {
-            // FAIL //
+          it('Should not connect with invalid @data property', async done => {
+            // Emit offer signal for receiver //
+            receiver.socket.binary(false).emit(signals.answerSignal, {
+              data: 'invalid',
+              connId: connId
+            })
+
+            // Listen for confirmation SignalServer received signal //
+            receiver.socket.on(signals.receivedSignal, signal => {
+              throw new Error('Connected with invalid @data property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
+
+          it('Should not connect with missing @connId property', async done => {
+            let encryptedSend = await CryptoUtils.encrypt(version, privateKey)
+
+            // Emit offer signal for receiver //
+            receiver.socket.binary(false).emit(signals.answerSignal, {
+              data: encryptedSend
+              // connId: connId
+            })
+
+            // Listen for confirmation SignalServer received signal //
+            receiver.socket.on(signals.receivedSignal, signal => {
+              throw new Error('Connected with missing @connId property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
+
+          // it('Should not connect with invalid @connId property', async done => {
+          //   let encryptedSend = await CryptoUtils.encrypt(version, privateKey)
+
+          //   // Emit offer signal for receiver //
+          //   receiver.socket.binary(false).emit(signals.answerSignal, {
+          //     data: encryptedSend,
+          //     connId: 'invalid'
+          //   })
+
+          //   // Listen for confirmation SignalServer received signal //
+          //   receiver.socket.on(signals.receivedSignal, signal => {
+          //     throw new Error('Connected with invalid @connId property')
+          //   })
+
+          //   // Pass after timeout //
+          //   pass(done)
+          // })
+        })
+
+        /*
+          =======================================================================
+            2c-1. Pairing -> Answer Creation -> AnswerSignal [Receiver → Server] -> SUCCESS
+          =======================================================================
+        */
+        describe('<SUCCESS>', () => {
+          it('Should transmit an answer to the received offer for retransmission to the initiator', async done => {
+            // Create Receiver WebRTC peer //
+            receiver.peer = new Peer(webRTCOptions)
+            receiver.peer.signal(receiver.offer)
+            receiver.peer.on(rtcSignals.signal, async data => {
+              expect(data).toHaveProperty('type')
+              expect(data).toHaveProperty('sdp')
+
+              // Send WebRTC offer as encrypted string //
+              let encryptedSend = await CryptoUtils.encrypt(
+                JSON.stringify(data),
+                privateKey
+              )
+
+              // Emit offer signal for receiver //
+              receiver.socket.binary(false).emit(signals.answerSignal, {
+                data: encryptedSend,
+                connId: connId
+              })
+
+              // Listen for confirmation SignalServer received signal //
+              receiver.socket.on(signals.receivedSignal, signal => {
+                expect(signal).toMatch(signals.answerSignal)
+                done()
+              })
+            })
+
+            receiver.peer.on(rtcSignals.error, async data => {
+              // FAIL //
+            })
           })
         })
       })
 
+      /*
+        =======================================================================
+          2c-2. Pairing -> Answer Creation -> Answer [Server → Initiator]
+        =======================================================================
+      */
       describe('Answer [Server → Initiator]', () => {
-        it('Should receive transmission of receiver answerSignal response to offer', async (done) => {
-          initiator.socket.on(signals.answer, async (data) => {
-            let decryptedMessage = await CryptoUtils.decrypt(data.data, privateKey)
+        /*
+          =======================================================================
+            2c-2. Pairing -> Answer Creation -> Answer [Server → Initiator] -> SUCCESS
+          =======================================================================
+        */
+        describe('<SUCCESS>', () => {
+          it('Should receive transmission of receiver answerSignal response to offer', async done => {
+            initiator.socket.on(signals.answer, async data => {
+              let decryptedMessage = await CryptoUtils.decrypt(
+                data.data,
+                privateKey
+              )
 
-            initiator.answer = JSON.parse(decryptedMessage)
-            let expectedVersionProperties = ['type', 'sdp']
-            expect(Object.keys(initiator.answer)).toEqual(expect.arrayContaining(expectedVersionProperties))
-            done()
+              initiator.answer = JSON.parse(decryptedMessage)
+              let expectedVersionProperties = ['type', 'sdp']
+              expect(Object.keys(initiator.answer)).toEqual(
+                expect.arrayContaining(expectedVersionProperties)
+              )
+              done()
+            })
           })
         })
       })
@@ -543,56 +813,92 @@ describe('Signal Server', () => {
       =======================================================================
     */
     describe('RTC Connection', () => {
+      /*
+        ======================================================================
+          2d. Pairing -> RTC Connection -> RTC Connection [Initiator & Receiver]
+        =======================================================================
+      */
       describe('RTC Connection [Initiator & Receiver] ', () => {
-        it('Should establish RTC connection between the initiator and receiver', async (done) => {
-          // Ensure Initiator is connected. Must also send signal to connect to receiver //
-          let initiatorPeerConnectPromise = new Promise((resolve, reject) => {
-            initiator.peer.signal(initiator.answer)
-            initiator.peer.on(rtcSignals.connect, data => {
-              resolve()
+        /*
+          ======================================================================
+            2d. Pairing -> RTC Connection -> RTC Connection [Initiator & Receiver] -> SUCCESS
+          =======================================================================
+        */
+        describe('<SUCCESS>', () => {
+          it('Should establish RTC connection between the initiator and receiver', async done => {
+            // Ensure Initiator is connected. Must also send signal to connect to receiver //
+            let initiatorPeerConnectPromise = new Promise((resolve, reject) => {
+              initiator.peer.signal(initiator.answer)
+              initiator.peer.on(rtcSignals.connect, data => {
+                resolve()
+              })
+              initiator.peer.on(rtcSignals.error, err => {
+                reject(err)
+              })
             })
-            initiator.peer.on(rtcSignals.error, err => {
-              reject(err)
+
+            // Ensure Receiver is connected //
+            let receiverPeerConnectPromise = new Promise((resolve, reject) => {
+              receiver.peer.on(rtcSignals.connect, data => {
+                resolve()
+              })
+              receiver.peer.on(rtcSignals.error, err => {
+                reject(err)
+              })
             })
+
+            // Await promises from both receiver and initiator //
+            await Promise.all([
+              receiverPeerConnectPromise,
+              initiatorPeerConnectPromise
+            ])
+
+            // Success //
+            done()
           })
-
-          // Ensure Receiver is connected //
-          let receiverPeerConnectPromise = new Promise((resolve, reject) => {
-            receiver.peer.on(rtcSignals.connect, data => {
-              resolve()
-            })
-            receiver.peer.on(rtcSignals.error, err => {
-              reject(err)
-            })
-          })
-
-          // Await promises from both receiver and initiator //
-          await Promise.all([
-            receiverPeerConnectPromise,
-            initiatorPeerConnectPromise
-          ])
-
-          // Success //
-          done()
         })
       })
 
+      /*
+        ======================================================================
+          2d. Pairing -> RTC Connection -> RtcConnected [Initiator → Server]
+        =======================================================================
+      */
       describe('RtcConnected [Initiator → Server]', () => {
-        it('Should inform SignalServer of successful RTC connection', async (done) => {
-          initiator.socket.binary(false).emit(signals.rtcConnected, connId)
-          initiator.socket.on(signals.receivedSignal, signal => {
-            expect(signal).toMatch(signals.rtcConnected)
-            done()
+        /*
+          ======================================================================
+            2d. Pairing -> RTC Connection -> RtcConnected [Initiator → Server] -> SUCCESS
+          =======================================================================
+        */
+        describe('<SUCCESS>', () => {
+          it('Should inform SignalServer of successful RTC connection', async done => {
+            initiator.socket.binary(false).emit(signals.rtcConnected, connId)
+            initiator.socket.on(signals.receivedSignal, signal => {
+              expect(signal).toMatch(signals.rtcConnected)
+              done()
+            })
           })
         })
       })
 
+      /*
+        ======================================================================
+          2d. Pairing -> RTC Connection -> RtcConnected [Receiver → Server]
+        =======================================================================
+      */
       describe('RtcConnected [Receiver → Server]', () => {
-        it('Should inform SignalServer of successful RTC connection', async (done) => {
-          receiver.socket.binary(false).emit(signals.rtcConnected, connId)
-          receiver.socket.on(signals.receivedSignal, signal => {
-            expect(signal).toMatch(signals.rtcConnected)
-            done()
+        /*
+          ======================================================================
+            2d. Pairing -> RTC Connection -> RtcConnected [Receiver → Server] -> SUCCESS
+          =======================================================================
+        */
+        describe('<SUCCESS>', () => {
+          it('Should inform SignalServer of successful RTC connection', async done => {
+            receiver.socket.binary(false).emit(signals.rtcConnected, connId)
+            receiver.socket.on(signals.receivedSignal, signal => {
+              expect(signal).toMatch(signals.rtcConnected)
+              done()
+            })
           })
         })
       })

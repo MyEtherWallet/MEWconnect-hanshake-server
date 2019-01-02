@@ -1,106 +1,60 @@
-import Schema from 'validate';
+import Schema from 'validate'
 
-const wholeEncrypted = ['answerSignal', 'offerSignal'];
-const signature = 'signature';
-const rtcConnected = 'rtcConnected';
-const tryTurn = 'tryTurn';
+const wholeEncrypted = ['answerSignal', 'offerSignal', 'signature']
+const signature = 'signature'
+const rtcConnected = 'rtcConnected'
+const tryTurn = 'tryTurn'
 
 const optionsCheck = opts => {
   if (typeof opts === 'string') {
-    return true;
+    return true
   } else if (typeof opts === 'number') {
-    return false;
+    return false
   } else if (typeof opts === 'object') {
-    return true;
-  } else  {
-    return false;
+    return true
+  } else {
+    return false
   }
-};
+}
 
 const rtcConnectedValidator = new Schema({
   type: String,
-  required: true,
-});
+  required: true
+})
 const signatureValidator = new Schema({
   signed: {
     type: String,
-    required: true,
+    required: true
   },
   connId: {
     type: String,
-    required: true,
+    required: true
   },
   version: {
     iv: {
       type: {
         type: String,
-        required: true,
+        required: true
       },
       data: {
         type: Array,
-        required: true,
+        required: true
       }
     },
     ephemPublicKey: {
       type: {
         type: String,
-        required: true,
+        required: true
       },
       data: {
         type: Array,
-        required: true,
+        required: true
       }
     },
     ciphertext: {
       type: {
         type: String,
-        required: true,
-      },
-      data: {
-        type: Array,
-        required: true,
-      }
-    },
-    mac: {
-      type: {
-        type: String,
-        required: true,
-      },
-      data: {
-        type: Array,
-        required: true,
-      }
-    }
-  }
-});
-const encryptedValidator = new Schema({
-  data: {
-    iv: {
-      type: {
-        type: String,
-        required: true,
-      },
-      data: {
-        type: Array,
-        required: true,
-        length: 16
-      }
-    },
-    ephemPublicKey: {
-      type: {
-        type: String,
-        required: true,
-      },
-      data: {
-        type: Array,
-        required: true,
-        length: 65
-      }
-    },
-    ciphertext: {
-      type: {
-        type: String,
-        required: true,
+        required: true
       },
       data: {
         type: Array,
@@ -110,56 +64,105 @@ const encryptedValidator = new Schema({
     mac: {
       type: {
         type: String,
-        required: true,
+        required: true
       },
       data: {
         type: Array,
-        required: true,
-        length: 32
+        required: true
       }
     }
-  },
-  connId: {
-    type: String,
-    required: true
   }
-}, {strip: false});
+})
+const encryptedValidator = new Schema(
+  {
+    data: {
+      iv: {
+        type: {
+          type: String,
+          required: true
+        },
+        data: {
+          type: Array,
+          required: true,
+          length: 16
+        }
+      },
+      ephemPublicKey: {
+        type: {
+          type: String,
+          required: true
+        },
+        data: {
+          type: Array,
+          required: true,
+          length: 65
+        }
+      },
+      ciphertext: {
+        type: {
+          type: String,
+          required: true
+        },
+        data: {
+          type: Array,
+          required: true
+        }
+      },
+      mac: {
+        type: {
+          type: String,
+          required: true
+        },
+        data: {
+          type: Array,
+          required: true,
+          length: 32
+        }
+      }
+    },
+    connId: {
+      type: String,
+      required: true
+    }
+  },
+  { strip: false }
+)
 const tryTurnValidator = new Schema({
   connId: {
     type: String,
     required: true
   },
   cont: {
-    type: Boolean,
+    type: Boolean
   }
 })
 
-export default function isValid(message) {
+export default function isValid (message) {
   return new Promise((resolve, reject) => {
-    let errors;
+    let errors
     if (wholeEncrypted.includes(message[0])) {
-      errors = encryptedValidator.validate(message[1]);
+      errors = encryptedValidator.validate(message[1])
     } else if (message[0] === signature) {
-      errors = signatureValidator.validate(message[1]);
+      errors = signatureValidator.validate(message[1])
     } else if (message[0] === rtcConnected) {
-      errors = rtcConnectedValidator.validate(message[1]);
+      errors = rtcConnectedValidator.validate(message[1])
     } else if (message[0] === tryTurn) {
-      errors = tryTurnValidator.validate(message[1]);
+      errors = tryTurnValidator.validate(message[1])
     } else {
-      reject();
+      reject(errors)
     }
 
     if (message[1].options !== undefined && message[1].options !== null) {
       if (!optionsCheck(message[1].options)) {
-        if (!errors) errors = [];
-        errors.push('Invalid Options Field');
+        if (!errors) errors = []
+        errors.push('Invalid Options Field')
       }
     }
 
     if (errors.length > 0) {
-      reject();
+      reject(errors)
     } else {
-      resolve();
+      resolve()
     }
-  });
+  })
 }

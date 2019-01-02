@@ -15,7 +15,13 @@ import twilio from 'twilio'
 // Lib //
 import validator from '@helpers/validators'
 import RedisClient from '@clients/redis-client'
-import { redisConfig, serverConfig, socketConfig, signal, stages } from '@config'
+import {
+  redisConfig,
+  serverConfig,
+  socketConfig,
+  signal,
+  stages
+} from '@config'
 
 // SignalServer Loggers //
 const errorLogger = createLogger('SignalServer:ERROR')
@@ -44,7 +50,7 @@ export default class SignalServer {
    * @param {Object} options.redis.host - Host address of the Redis client
    * @param {Object} options.redis.port - Port that the Redis host runs on
    */
-  constructor (options = {}) {
+  constructor(options = {}) {
     // Instantiate member variable options //
     this.options = options
 
@@ -64,7 +70,7 @@ export default class SignalServer {
     this.io = {}
   }
 
-  async init () {
+  async init() {
     // Create HTTP server //
     this.server = await http.createServer()
 
@@ -74,21 +80,25 @@ export default class SignalServer {
     // Promisify server.listen for async/await and listen on configured options //
     let serverPromise = promisify(this.server.listen).bind(this.server)
     await serverPromise({ host: this.host, port: this.port })
-    infoLogger.info(`Listening on ${this.server.address().address}:${this.port}`)
+    infoLogger.info(
+      `Listening on ${this.server.address().address}:${this.port}`
+    )
 
     // Create socket.io connection using socket.io-redis //
     this.io = await socketIO(this.server, this.options.socket)
-    this.io.adapter(redisAdapter({
-      host: this.options.redis.host,
-      port: this.options.redis.port
-    }))
+    this.io.adapter(
+      redisAdapter({
+        host: this.options.redis.host,
+        port: this.options.redis.port
+      })
+    )
     this.io.on(signal.connection, this.ioConnection.bind(this))
 
     // Ready //
     infoLogger.info('SignalServer Ready!')
   }
 
-  async validate (message, next) {
+  async validate(message, next) {
     try {
       await validator(message)
       return next()
@@ -97,7 +107,7 @@ export default class SignalServer {
     }
   }
 
-  ioConnection (socket) {
+  ioConnection(socket) {
     try {
       // Use class function validate() middleware //
       socket.use(this.validate.bind(this))
@@ -108,7 +118,8 @@ export default class SignalServer {
       const connId = token.connId || false
 
       // ERROR: invalid connection id //
-      if (this.isInvalidHex(connId)) throw new Error('Connection attempted to pass an invalid connection ID')
+      if (this.isInvalidHex(connId))
+        throw new Error('Connection attempted to pass an invalid connection ID')
 
       // Handle connection based on stage provided by token //
       switch (stage) {
@@ -134,13 +145,19 @@ export default class SignalServer {
 
       // Handle signal "offerSignal" event //
       socket.on(signal.offerSignal, offerData => {
-        verbose(`${signal.offerSignal} signal Recieved for ${offerData.connId} `)
-        this.io.to(offerData.connId).emit(signal.offer, {data: offerData.data})
+        verbose(
+          `${signal.offerSignal} signal Recieved for ${offerData.connId} `
+        )
+        this.io
+          .to(offerData.connId)
+          .emit(signal.offer, { data: offerData.data })
       })
 
       // Handle signal "answerSignal" event //
       socket.on(signal.answerSignal, answerData => {
-        verbose(`${signal.answerSignal} signal Recieved for ${answerData.connId} `)
+        verbose(
+          `${signal.answerSignal} signal Recieved for ${answerData.connId} `
+        )
         this.io.to(answerData.connId).emit(signal.answer, {
           data: answerData.data,
           options: answerData.options
@@ -162,11 +179,11 @@ export default class SignalServer {
         socket.disconnect(true)
       })
     } catch (e) {
-      errorLogger.error('ioConnection:createTurnConnection', {e})
+      errorLogger.error('ioConnection:createTurnConnection', { e })
     }
   }
 
-  isInvalidHex (hex) {
-    return !(/[0-9A-Fa-f].*/.test(hex));
+  isInvalidHex(hex) {
+    return !/[0-9A-Fa-f].*/.test(hex)
   }
 }

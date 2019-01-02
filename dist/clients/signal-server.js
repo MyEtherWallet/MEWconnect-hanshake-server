@@ -161,7 +161,9 @@ var SignalServer = function () {
          * Todo: doesn't check for proper connId, can add random strings
          */
         if (this.invalidHex(connId)) {
-          socket.emit(_config.signals.error, { msg: 'Connection attempted to pass an invalid connection ID' });
+          socket.emit(_config.signals.error, {
+            msg: 'Connection attempted to pass an invalid connection ID'
+          });
           socket.disconnect(true);
           throw new Error('Connection attempted to pass an invalid connection ID');
         }
@@ -231,7 +233,7 @@ var SignalServer = function () {
       return !/[0-9A-Fa-f].*/.test(hex);
     }
 
-    ////////////////////////////// 
+    //////////////////////////////
 
   }, {
     key: 'createTurnConnection',
@@ -254,6 +256,7 @@ var SignalServer = function () {
       /**
        * TODO: Add property check
        */
+
       try {
         initiatorLog('INITIATOR CONNECTION with connection ID: ' + details.connId);
         extraverbose('Initiator details: ', details);
@@ -274,7 +277,6 @@ var SignalServer = function () {
       try {
         receiverLog('RECEIVER CONNECTION for ' + details.connId);
         if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
-
         this.redis.locateMatchingConnection(details.connId).then(function (_result) {
           if (_result) {
             verbose(_result);
@@ -332,7 +334,9 @@ var SignalServer = function () {
             socket.emit(_config.signals.invalidConnection);
           }
         }).catch(function (error) {
-          errorLogger.error('receiverConfirm:locateMatchingConnection', { error: error });
+          errorLogger.error('receiverConfirm:locateMatchingConnection', {
+            error: error
+          });
         });
       } catch (e) {
         errorLogger.error('receiverConfirm', { e: e });

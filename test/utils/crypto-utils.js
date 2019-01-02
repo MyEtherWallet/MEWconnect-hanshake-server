@@ -24,7 +24,7 @@ export default (() => {
    * @param  {String} publicKey - publicKey string (usually generated with generateKeys())
    * @return {String} - connId string
    */
-  const generateConnId = (publicKey) => {
+  const generateConnId = publicKey => {
     return publicKey.toString('hex').slice(32)
   }
 
@@ -117,12 +117,12 @@ export default (() => {
     })
   }
 
-  const isJSON = (arg) => {
+  const isJSON = arg => {
     try {
-      JSON.parse(arg);
-      return true;
+      JSON.parse(arg)
+      return true
     } catch (e) {
-      return false;
+      return false
     }
   }
 

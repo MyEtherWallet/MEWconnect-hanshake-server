@@ -10,6 +10,7 @@
     "asFunctionExample": "babel-node ./example/example2.js",
     "prod": "node dist/run.js",
     "dev": "env NODE_ENV=development nodemon --exec npm start",
+    "lint": "prettier --write 'src/**/*.{js,json}' 'test/**/*.{js,json}'",
     "test": "npm run build && NODE_ENV=test CONNECTION_TIMEOUT=1000 jest --detectOpenHandles --forceExit --runInBand --verbose --silent --noStackTrace",
     "test:verbose": "npm run build && NODE_ENV=test CONNECTION_TIMEOUT=1000 jest --detectOpenHandles --forceExit --runInBand --verbose",
     "test:debug": "npm run build && NODE_ENV=test CONNECTION_TIMEOUT=1000 DEBUG=* jest --detectOpenHandles --forceExit --runInBand --verbose",

@@ -208,7 +208,9 @@ var SignalServer = function () {
             socket.emit(_config.signal.invalidConnection);
           }
         }).catch(function (error) {
-          errorLogger.error('receiverConfirm:locateMatchingConnection', { error: error });
+          errorLogger.error('receiverConfirm:locateMatchingConnection', {
+            error: error
+          });
         });
       } catch (e) {
         errorLogger.error('receiverConfirm', { e: e });
@@ -286,7 +288,9 @@ var SignalServer = function () {
                   turnLog('ice servers returned. token.iceServers: ' + _results.iceServers);
                 }).catch(function (error) {
                   turnLog('Error: createTurnConnectionr ' + connData.connId + ' ');
-                  errorLogger.error('ioConnection:createTurnConnection', { error: error });
+                  errorLogger.error('ioConnection:createTurnConnection', {
+                    error: error
+                  });
                 });
               } catch (e) {
                 errorLogger.error('ioConnection:createTurnConnection', { e: e });

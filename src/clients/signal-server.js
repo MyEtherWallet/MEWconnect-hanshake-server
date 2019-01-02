@@ -15,7 +15,13 @@ import twilio from 'twilio'
 // Lib //
 import validator from '@helpers/validators'
 import RedisClient from '@clients/redis-client'
-import { redisConfig, serverConfig, socketConfig, signals, stages } from '@config'
+import {
+  redisConfig,
+  serverConfig,
+  socketConfig,
+  signals,
+  stages
+} from '@config'
 
 // SignalServer Loggers //
 const errorLogger = createLogger('SignalServer:ERROR')
@@ -74,14 +80,18 @@ export default class SignalServer {
     // Promisify server.listen for async/await and listen on configured options //
     let serverPromise = promisify(this.server.listen).bind(this.server)
     await serverPromise({ host: this.host, port: this.port })
-    infoLogger.info(`Listening on ${this.server.address().address}:${this.port}`)
+    infoLogger.info(
+      `Listening on ${this.server.address().address}:${this.port}`
+    )
 
     // Create socket.io connection using socket.io-redis //
     this.io = await socketIO(this.server, this.options.socket)
-    this.io.adapter(redisAdapter({
-      host: this.options.redis.host,
-      port: this.options.redis.port
-    }))
+    this.io.adapter(
+      redisAdapter({
+        host: this.options.redis.host,
+        port: this.options.redis.port
+      })
+    )
     this.io.on(signals.connection, this.ioConnection.bind(this))
 
     // Ready //
@@ -112,7 +122,9 @@ export default class SignalServer {
        * Todo: doesn't check for proper connId, can add random strings
        */
       if (this.invalidHex(connId)) {
-        socket.emit(signals.error, { msg: 'Connection attempted to pass an invalid connection ID' })
+        socket.emit(signals.error, {
+          msg: 'Connection attempted to pass an invalid connection ID'
+        })
         socket.disconnect(true)
         throw new Error('Connection attempted to pass an invalid connection ID')
       }
@@ -144,13 +156,17 @@ export default class SignalServer {
       socket.on(signals.offerSignal, offerData => {
         socket.emit(signals.receivedSignal, signals.offerSignal)
         verbose(`${signals.offerSignal} signal Recieved for ${offerData.connId} `)
-        this.io.to(offerData.connId).emit(signals.offer, {data: offerData.data})
+        this.io
+          .to(offerData.connId)
+          .emit(signals.offer, { data: offerData.data })
       })
 
       // Handle signal "answerSignal" event //
       socket.on(signals.answerSignal, answerData => {
         socket.emit(signals.receivedSignal, signals.answerSignal)
-        verbose(`${signals.answerSignal} signal Recieved for ${answerData.connId} `)
+        verbose(
+          `${signals.answerSignal} signal Recieved for ${answerData.connId} `
+        )
         this.io.to(answerData.connId).emit(signals.answer, {
           data: answerData.data,
           options: answerData.options
@@ -173,120 +189,138 @@ export default class SignalServer {
         socket.disconnect(true)
       })
     } catch (e) {
-      errorLogger.error('ioConnection:createTurnConnection', {e})
+      errorLogger.error('ioConnection:createTurnConnection', { e })
     }
   }
 
   invalidHex (hex) {
-    return !(/[0-9A-Fa-f].*/.test(hex));
+    return !/[0-9A-Fa-f].*/.test(hex)
   }
 
-  ////////////////////////////// 
-  createTurnConnection() {
+  //////////////////////////////
+  createTurnConnection () {
     try {
-      turnLog('CREATE TURN CONNECTION');
-      const accountSid = process.env.TWILIO;
-      const authToken = process.env.TWILIO_TOKEN;
-      const ttl = process.env.TWILIO_TTL;
-      const client = twilio(accountSid, authToken);
-      return client.tokens
-        .create({ttl: ttl});
+      turnLog('CREATE TURN CONNECTION')
+      const accountSid = process.env.TWILIO
+      const authToken = process.env.TWILIO_TOKEN
+      const ttl = process.env.TWILIO_TTL
+      const client = twilio(accountSid, authToken)
+      return client.tokens.create({ ttl: ttl })
     } catch (e) {
-      errorLogger.error(e);
-      return null;
+      errorLogger.error(e)
+      return null
     }
   }
 
-  initiatorIncomming(socket, details) {
+  initiatorIncomming (socket, details) {
     /**
      * TODO: Add property check
-     */  
+     */
+
     try {
-      initiatorLog(`INITIATOR CONNECTION with connection ID: ${details.connId}`);
-      extraverbose('Initiator details: ', details);
-      if (this.invalidHex(socket.id)) throw new Error('Connection attempted to pass an invalid socket ID');
-      this.redis.createConnectionEntry(details, socket.id)
-        .then(() => {
-          socket.join(details.connId);
-          socket.emit(signals.initiated, details)
-        });
+      initiatorLog(`INITIATOR CONNECTION with connection ID: ${details.connId}`)
+      extraverbose('Initiator details: ', details)
+      if (this.invalidHex(socket.id))
+        throw new Error('Connection attempted to pass an invalid socket ID')
+      this.redis.createConnectionEntry(details, socket.id).then(() => {
+        socket.join(details.connId)
+        socket.emit(signals.initiated, details)
+      })
     } catch (e) {
-      errorLogger.error('initiatorIncomming', {e});
+      errorLogger.error('initiatorIncomming', { e })
     }
   }
 
   receiverIncomming(socket, details) {
     try {
-      receiverLog(`RECEIVER CONNECTION for ${details.connId}`);
-      if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
-
-      this.redis.locateMatchingConnection(details.connId)
-        .then(_result => {
-          if (_result) {
-            verbose(_result);
-            this.redis.getConnectionEntry(details.connId)
-              .then(_result => {
-                socket.emit(signals.handshake, {toSign: _result.message});
-              });
-          } else {
-            receiverLog(`NO INITIATOR CONNECTION FOUND FOR ${details.connId}`);
-            socket.emit(signals.invalidConnection);
-          }
-        });
+      receiverLog(`RECEIVER CONNECTION for ${details.connId}`)
+      if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID')
+      this.redis.locateMatchingConnection(details.connId).then(_result => {
+        if (_result) {
+          verbose(_result)
+          this.redis.getConnectionEntry(details.connId).then(_result => {
+            socket.emit(signals.handshake, { toSign: _result.message })
+          })
+        } else {
+          receiverLog(`NO INITIATOR CONNECTION FOUND FOR ${details.connId}`)
+          socket.emit(signals.invalidConnection)
+        }
+      })
     } catch (e) {
-      errorLogger.error('receiverIncoming', {e});
+      errorLogger.error('receiverIncoming', { e })
     }
   }
 
   receiverConfirm(socket, details) {
     try {
-      receiverLog('RECEIVER CONFIRM: ', details.connId);
-      if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
-      this.redis.locateMatchingConnection(details.connId)
+      receiverLog('RECEIVER CONFIRM: ', details.connId)
+      if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID')
+      this.redis
+        .locateMatchingConnection(details.connId)
         .then(_result => {
-          receiverLog(`Located Matching Connection for ${details.connId}`);
-          verbose(_result);
+          receiverLog(`Located Matching Connection for ${details.connId}`)
+          verbose(_result)
           if (_result) {
-            this.redis.verifySig(details.connId, details.signed)
+            this.redis
+              .verifySig(details.connId, details.signed)
               .then(_result => {
                 if (_result) {
-                  socket.join(details.connId);
-                  receiverLog(`PAIR CONNECTION VERIFICATION COMPLETED for ${details.connId}`);
-                  this.redis.updateConnectionEntry(details.connId, socket.id)
+                  socket.join(details.connId)
+                  receiverLog(
+                    `PAIR CONNECTION VERIFICATION COMPLETED for ${
+                      details.connId
+                    }`
+                  )
+                  this.redis
+                    .updateConnectionEntry(details.connId, socket.id)
                     .then(_result => {
                       if (_result) {
-                        receiverLog(`Updated connection entry for ${details.connId}`);
+                        receiverLog(
+                          `Updated connection entry for ${details.connId}`
+                        )
                         socket.to(details.connId).emit(signals.confirmation, {
                           connId: details.connId,
                           version: details.version
-                        });
+                        })
                       } else {
-                        receiverLog(`CONFIRMATION FAILED: BUSY for connection ID ${details.connId}`);
-                        socket.to(details.connId).emit(signals.confirmationFailedBusy);
+                        receiverLog(
+                          `CONFIRMATION FAILED: BUSY for connection ID ${
+                            details.connId
+                          }`
+                        )
+                        socket
+                          .to(details.connId)
+                          .emit(signals.confirmationFailedBusy)
                       }
                     })
                     .catch(error => {
-                      errorLogger.error('receiverConfirm:updateConnectionEntry', {error});
-                    });
+                      errorLogger.error(
+                        'receiverConfirm:updateConnectionEntry',
+                        { error }
+                      )
+                    })
                 } else {
-                  receiverLog(`CONNECTION VERIFY FAILED for ${details.connId}`);
-                  socket.emit(signals.confirmationFailed);
+                  receiverLog(`CONNECTION VERIFY FAILED for ${details.connId}`)
+                  socket.emit(signals.confirmationFailed)
                 }
               })
               .catch(error => {
-                errorLogger.error('receiverConfirm:verifySig', {error});
-              });
+                errorLogger.error('receiverConfirm:verifySig', { error })
+              })
           } else {
-            receiverLog(`INVALID CONNECTION DETAILS PROVIDED for ${details.connId}`);
-            socket.emit(signals.invalidConnection);
+            receiverLog(
+              `INVALID CONNECTION DETAILS PROVIDED for ${details.connId}`
+            )
+            socket.emit(signals.invalidConnection)
           }
         })
         .catch(error => {
-          errorLogger.error('receiverConfirm:locateMatchingConnection', {error});
-        });
+          errorLogger.error('receiverConfirm:locateMatchingConnection', {
+            error
+          })
+        })
     } catch (e) {
-      errorLogger.error('receiverConfirm', {e});
+      errorLogger.error('receiverConfirm', { e })
     }
   }
-
 }

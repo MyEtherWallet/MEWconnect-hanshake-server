@@ -21,7 +21,7 @@ const signals = {
   confirmationFailedBusy: 'confirmationFailedBusy',
   confirmationFailed: 'confirmationFailed',
   receivedSignal: 'receivedSignal',
-  'error': 'error'
+  error: 'error'
 }
 
 const stages = {
@@ -37,8 +37,4 @@ const rtcSignals = {
   signal: 'signal'
 }
 
-export {
-  signals,
-  stages,
-  rtcSignals
-}
+export { signals, stages, rtcSignals }

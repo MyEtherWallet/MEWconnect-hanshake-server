@@ -6,6 +6,4 @@ const redisConfig = {
   timeout: process.env.REDIS_TIMOUT || 120
 }
 
-export {
-  redisConfig
-}
+export { redisConfig }

@@ -24,7 +24,7 @@ var signals = {
   confirmationFailedBusy: 'confirmationFailedBusy',
   confirmationFailed: 'confirmationFailed',
   receivedSignal: 'receivedSignal',
-  'error': 'error'
+  error: 'error'
 };
 
 var stages = {
