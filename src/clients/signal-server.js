@@ -1,8 +1,6 @@
 'use strict'
 
 // Import //
-// todo look into refactoring to accept plug-in testing data, and/or testing tools
-import createLogger from 'logging'
 import debug from 'debug'
 import dotenv from 'dotenv'
 import http from 'http'
@@ -24,8 +22,8 @@ import {
 } from '@config'
 
 // SignalServer Loggers //
-const errorLogger = createLogger('SignalServer:ERROR')
-const infoLogger = createLogger('SignalServer:INFO')
+const errorLogger = logger('SignalServer:ERROR')
+const infoLogger = logger('SignalServer:INFO')
 
 // Signal Loggers //
 debug.log = console.log.bind(console)
