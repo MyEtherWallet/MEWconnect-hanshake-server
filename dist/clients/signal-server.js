@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", {
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 // Lib //
+// import validator from '@helpers/validators'
 
 
 var _debug = require('debug');
@@ -41,15 +42,13 @@ var _twilio = require('twilio');
 
 var _twilio2 = _interopRequireDefault(_twilio);
 
-var _validators = require('@helpers/validators');
-
-var _validators2 = _interopRequireDefault(_validators);
-
 var _redisClient = require('@clients/redis-client');
 
 var _redisClient2 = _interopRequireDefault(_redisClient);
 
 var _config = require('@config');
+
+var _validation = require('@helpers/validation');
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -66,6 +65,35 @@ var receiverLog = (0, _debug2.default)('signal:receiver');
 var turnLog = (0, _debug2.default)('signal:turn');
 var verbose = (0, _debug2.default)('signal:verbose');
 var extraverbose = (0, _debug2.default)('verbose');
+
+/*
+|--------------------------------------------------------------------------
+|
+| SignalServer
+|
+|--------------------------------------------------------------------------
+|
+| 12/18/2018
+|
+| The goal of these integration tests are to ensure the functionality of the SignalServer.
+| The SignalServer attempts to pair two "signaling" peers together via a secure Socket.io connection.
+| These peers will then establish a webRTC connection to each other, allowing
+| secure communication using the credentials created during the pairing process.
+|
+| The tests attempt to mirror the process defined in the following documentation outline:
+| https://docs.google.com/document/d/19acrYB3iLT4j9JDg0xGcccLXFenqfSlNiKVpXOdLL6Y
+|
+| There are (2) primary processes that must be tested, the majority of which occurs in the
+| "Pairing" section:
+|
+| 1. Initialization
+  2. Pairing
+|     a. Initial Signaling
+|     b. Offer Creation
+|     c. Answer Creation
+|     d. RTC Connection
+|
+*/
 
 var SignalServer = function () {
   /**
@@ -106,6 +134,17 @@ var SignalServer = function () {
     this.io = {};
   }
 
+  /**
+   * Initialize the SignalServer instance.
+   *
+   * 1. Initialize HTTP Server
+   * 2. Initialize Redis Client
+   * 3. Initialize SocketIO server
+   * 4. Connect Redis Adapter
+   * 5. Bind SocketIO on-connection middleware
+   */
+
+
   _createClass(SignalServer, [{
     key: 'init',
     value: async function init() {
@@ -131,40 +170,35 @@ var SignalServer = function () {
       // Ready //
       infoLogger.info('SignalServer Ready!');
     }
-  }, {
-    key: 'validate',
-    value: async function validate(message, next) {
-      try {
-        await (0, _validators2.default)(message);
-        return next();
-      } catch (e) {
-        return next(new Error('invalid signal or parameters'));
-      }
-    }
+
+    /*
+    ===================================================================================
+      "Middlewares"
+    ===================================================================================
+    */
+
+    /**
+     * Middleware to handle the initial socket on "connection" event from a client.
+     * 1. Validate signal parameters
+     * 2. Identify client as a "initiatior" or "receiver" depending on their handshake.query parameters
+     * 3. Bind events to handle each signal request from a client
+     */
+
   }, {
     key: 'ioConnection',
     value: function ioConnection(socket) {
-      var _this = this;
-
       try {
         // Use class function validate() middleware //
-        socket.use(this.validate.bind(this));
+        socket.use(this.validateSignal.bind(this));
 
         // Get socket handshake query token //
         var token = socket.handshake.query;
         var stage = token.stage || false;
         var connId = token.connId || false;
 
-        // ERROR: invalid connection id //
-        /**
-         * Todo: doesn't check for proper connId, can add random strings
-         */
+        // ERROR: invalid connId//
         if (this.invalidConnId(connId)) {
-          // socket.emit(signals.error, {
-          //   msg: 'Connection attempted to pass an invalid connection ID'
-          // })
-          // socket.disconnect(true)
-          throw new Error('Connection attempted to pass an invalid connection ID');
+          throw new Error('Connection attempted to pass an invalid connId');
         }
 
         // Handle connection based on stage provided by token //
@@ -182,52 +216,11 @@ var SignalServer = function () {
             return false;
         }
 
-        // Handle signal "signature" event //
-        socket.on(_config.signals.signature, function (data) {
-          if (_this.invalidConnId(data.connId)) {
-            // Invalid
-          } else {
-            socket.emit(_config.signals.receivedSignal, _config.signals.signature);
-            verbose(_config.signals.signature + ' signal Recieved for ' + data.connId + ' ');
-            extraverbose('Recieved: ', _config.signals.signature);
-            _this.receiverConfirm(socket, data);
-          }
-        });
-
-        // Handle signal "offerSignal" event //
-        socket.on(_config.signals.offerSignal, function (offerData) {
-          if (_this.invalidConnId(offerData.connId)) {
-            // Invalid
-          } else {
-            socket.emit(_config.signals.receivedSignal, _config.signals.offerSignal);
-            verbose(_config.signals.offerSignal + ' signal Recieved for ' + offerData.connId + ' ');
-            _this.io.to(offerData.connId).emit(_config.signals.offer, { data: offerData.data });
-          }
-        });
-
-        // Handle signal "answerSignal" event //
-        socket.on(_config.signals.answerSignal, function (answerData) {
-          if (_this.invalidConnId(answerData.connId)) {
-            // Invalid
-          } else {
-            socket.emit(_config.signals.receivedSignal, _config.signals.answerSignal);
-            verbose(_config.signals.answerSignal + ' signal Recieved for ' + answerData.connId + ' ');
-            _this.io.to(answerData.connId).emit(_config.signals.answer, {
-              data: answerData.data,
-              options: answerData.options
-            });
-          }
-        });
-
-        // Handle signal "rtcConnected" event //
-        socket.on(_config.signals.rtcConnected, function (connId) {
-          // Clean up client record
-          socket.emit(_config.signals.receivedSignal, _config.signals.rtcConnected);
-          verbose('Removing connection entry for: ' + connId);
-          _this.redis.removeConnectionEntry(connId);
-          // socket.leave(connId)
-          verbose('WebRTC CONNECTED', connId);
-        });
+        // Bind socket events //
+        socket.on(_config.signals.signature, this.onSignature.bind(this, socket));
+        socket.on(_config.signals.offerSignal, this.onOfferSignal.bind(this, socket));
+        socket.on(_config.signals.answerSignal, this.onAnswerSignal.bind(this, socket));
+        socket.on(_config.signals.rtcConnected, this.onRtcConnected.bind(this, socket));
 
         // Handle signal "disconnect" event //
         socket.on(_config.signals.disconnect, function (reason) {
@@ -235,26 +228,54 @@ var SignalServer = function () {
           socket.disconnect(true);
         });
       } catch (e) {
-        errorLogger.error('ioConnection:createTurnConnection', { e: e });
+        errorLogger.error('ioConnection', { e: e });
       }
     }
+
+    /*
+    ===================================================================================
+      Socket Events
+    ===================================================================================
+    */
+
   }, {
-    key: 'invalidConnId',
-    value: function invalidConnId(hex) {
-      var validHex = /[0-9A-Fa-f].*/.test(hex);
-      var validLength = hex.length === 32;
-      var result = !(validHex && validLength);
-      // console.log(result)
-      return result;
+    key: 'onSignature',
+    value: function onSignature(socket, data) {
+      verbose(_config.signals.signature + ' signal Recieved for ' + data.connId + ' ');
+      socket.emit(_config.signals.receivedSignal, _config.signals.signature);
+      this.receiverConfirm(socket, data);
     }
   }, {
-    key: 'invalidHex',
-    value: function invalidHex(hex) {
-      var validHex = /[0-9A-Fa-f].*/.test(hex);
-      return !validHex;
+    key: 'onOfferSignal',
+    value: function onOfferSignal(socket, data) {
+      verbose(_config.signals.offerSignal + ' signal Recieved for ' + data.connId + ' ');
+      socket.emit(_config.signals.receivedSignal, _config.signals.offerSignal);
+      this.io.to(data.connId).emit(_config.signals.offer, { data: data.data });
+    }
+  }, {
+    key: 'onAnswerSignal',
+    value: function onAnswerSignal(socket, data) {
+      verbose(_config.signals.answerSignal + ' signal Recieved for ' + data.connId + ' ');
+      socket.emit(_config.signals.receivedSignal, _config.signals.answerSignal);
+      this.io.to(data.connId).emit(_config.signals.answer, {
+        data: data.data,
+        options: data.options
+      });
+    }
+  }, {
+    key: 'onRtcConnected',
+    value: function onRtcConnected(socket, data) {
+      verbose('Removing connection entry for: ' + data);
+      socket.emit(_config.signals.receivedSignal, _config.signals.rtcConnected);
+      this.redis.removeConnectionEntry(data);
+      verbose('WebRTC connected', data);
     }
 
-    //////////////////////////////
+    /*
+    ===================================================================================
+      Member Functions
+    ===================================================================================
+    */
 
   }, {
     key: 'createTurnConnection',
@@ -274,10 +295,6 @@ var SignalServer = function () {
   }, {
     key: 'initiatorIncomming',
     value: function initiatorIncomming(socket, details) {
-      /**
-       * TODO: Add property check
-       */
-
       try {
         initiatorLog('INITIATOR CONNECTION with connection ID: ' + details.connId);
         extraverbose('Initiator details: ', details);
@@ -294,7 +311,7 @@ var SignalServer = function () {
   }, {
     key: 'receiverIncomming',
     value: function receiverIncomming(socket, details) {
-      var _this2 = this;
+      var _this = this;
 
       try {
         receiverLog('RECEIVER CONNECTION for ' + details.connId);
@@ -303,7 +320,7 @@ var SignalServer = function () {
         this.redis.locateMatchingConnection(details.connId).then(function (_result) {
           if (_result) {
             verbose(_result);
-            _this2.redis.getConnectionEntry(details.connId).then(function (_result) {
+            _this.redis.getConnectionEntry(details.connId).then(function (_result) {
               socket.emit(_config.signals.handshake, { toSign: _result.message });
             });
           } else {
@@ -318,7 +335,7 @@ var SignalServer = function () {
   }, {
     key: 'receiverConfirm',
     value: function receiverConfirm(socket, details) {
-      var _this3 = this;
+      var _this2 = this;
 
       try {
         receiverLog('RECEIVER CONFIRM: ', details.connId);
@@ -327,14 +344,14 @@ var SignalServer = function () {
           receiverLog('Located Matching Connection for ' + details.connId);
           verbose(_result);
           if (_result) {
-            _this3.redis.verifySig(details.connId, details.signed).then(function (_result) {
+            _this2.redis.verifySig(details.connId, details.signed).then(function (_result) {
               if (_result) {
                 socket.join(details.connId);
                 receiverLog('PAIR CONNECTION VERIFICATION COMPLETED for ' + details.connId);
-                _this3.redis.updateConnectionEntry(details.connId, socket.id).then(function (_result) {
+                _this2.redis.updateConnectionEntry(details.connId, socket.id).then(function (_result) {
                   if (_result) {
                     receiverLog('Updated connection entry for ' + details.connId);
-                    _this3.io.to(details.connId).emit(_config.signals.confirmation, {
+                    _this2.io.to(details.connId).emit(_config.signals.confirmation, {
                       connId: details.connId,
                       version: details.version
                     });
@@ -364,6 +381,38 @@ var SignalServer = function () {
       } catch (e) {
         errorLogger.error('receiverConfirm', { e: e });
       }
+    }
+
+    /*
+    ===================================================================================
+      Validation
+    ===================================================================================
+    */
+
+  }, {
+    key: 'validateSignal',
+    value: async function validateSignal(message, next) {
+      try {
+        await (0, _validation.validateSignal)(message);
+        return next();
+      } catch (e) {
+        return next(new Error('invalid signal or parameters'));
+      }
+    }
+  }, {
+    key: 'invalidConnId',
+    value: function invalidConnId(hex) {
+      var validHex = /[0-9A-Fa-f].*/.test(hex);
+      var validLength = hex.length === 32;
+      var result = !(validHex && validLength);
+      // console.log(result)
+      return result;
+    }
+  }, {
+    key: 'invalidHex',
+    value: function invalidHex(hex) {
+      var validHex = /[0-9A-Fa-f].*/.test(hex);
+      return !validHex;
     }
   }]);
 

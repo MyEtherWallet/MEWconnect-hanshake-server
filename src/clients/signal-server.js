@@ -11,7 +11,7 @@ import socketIO from 'socket.io'
 import twilio from 'twilio'
 
 // Lib //
-import validator from '@helpers/validators'
+// import validator from '@helpers/validators'
 import RedisClient from '@clients/redis-client'
 import {
   redisConfig,
@@ -20,6 +20,9 @@ import {
   signals,
   stages
 } from '@config'
+import {
+  validateSignal
+} from '@helpers/validation'
 
 // SignalServer Loggers //
 const errorLogger = logger('SignalServer:ERROR')
@@ -32,6 +35,35 @@ const receiverLog = debug('signal:receiver')
 const turnLog = debug('signal:turn')
 const verbose = debug('signal:verbose')
 const extraverbose = debug('verbose')
+
+/*
+|--------------------------------------------------------------------------
+|
+| SignalServer
+|
+|--------------------------------------------------------------------------
+|
+| 12/18/2018
+|
+| The goal of these integration tests are to ensure the functionality of the SignalServer.
+| The SignalServer attempts to pair two "signaling" peers together via a secure Socket.io connection.
+| These peers will then establish a webRTC connection to each other, allowing
+| secure communication using the credentials created during the pairing process.
+|
+| The tests attempt to mirror the process defined in the following documentation outline:
+| https://docs.google.com/document/d/19acrYB3iLT4j9JDg0xGcccLXFenqfSlNiKVpXOdLL6Y
+|
+| There are (2) primary processes that must be tested, the majority of which occurs in the
+| "Pairing" section:
+|
+| 1. Initialization
+  2. Pairing
+|     a. Initial Signaling
+|     b. Offer Creation
+|     c. Answer Creation
+|     d. RTC Connection
+|
+*/
 
 export default class SignalServer {
   /**
@@ -68,6 +100,15 @@ export default class SignalServer {
     this.io = {}
   }
 
+  /**
+   * Initialize the SignalServer instance.
+   *
+   * 1. Initialize HTTP Server
+   * 2. Initialize Redis Client
+   * 3. Initialize SocketIO server
+   * 4. Connect Redis Adapter
+   * 5. Bind SocketIO on-connection middleware
+   */
   async init () {
     // Create HTTP server //
     this.server = await http.createServer()
@@ -96,35 +137,31 @@ export default class SignalServer {
     infoLogger.info('SignalServer Ready!')
   }
 
-  async validate (message, next) {
-    try {
-      await validator(message)
-      return next()
-    } catch (e) {
-      return next(new Error('invalid signal or parameters'))
-    }
-  }
+  /*
+  ===================================================================================
+    "Middlewares"
+  ===================================================================================
+  */
 
+  /**
+   * Middleware to handle the initial socket on "connection" event from a client.
+   * 1. Validate signal parameters
+   * 2. Identify client as a "initiatior" or "receiver" depending on their handshake.query parameters
+   * 3. Bind events to handle each signal request from a client
+   */
   ioConnection (socket) {
     try {
       // Use class function validate() middleware //
-      socket.use(this.validate.bind(this))
+      socket.use(this.validateSignal.bind(this))
 
       // Get socket handshake query token //
       const token = socket.handshake.query
       const stage = token.stage || false
       const connId = token.connId || false
 
-      // ERROR: invalid connection id //
-      /**
-       * Todo: doesn't check for proper connId, can add random strings
-       */
+      // ERROR: invalid connId//
       if (this.invalidConnId(connId)) {
-        // socket.emit(signals.error, {
-        //   msg: 'Connection attempted to pass an invalid connection ID'
-        // })
-        // socket.disconnect(true)
-        throw new Error('Connection attempted to pass an invalid connection ID')
+        throw new Error('Connection attempted to pass an invalid connId')
       }
 
       // Handle connection based on stage provided by token //
@@ -142,56 +179,11 @@ export default class SignalServer {
           return false
       }
 
-      // Handle signal "signature" event //
-      socket.on(signals.signature, data => {
-        if (this.invalidConnId(data.connId)) {
-          // Invalid
-        } else {
-          socket.emit(signals.receivedSignal, signals.signature)
-          verbose(`${signals.signature} signal Recieved for ${data.connId} `)
-          extraverbose('Recieved: ', signals.signature)
-          this.receiverConfirm(socket, data)
-        }
-      })
-
-      // Handle signal "offerSignal" event //
-      socket.on(signals.offerSignal, offerData => {
-        if (this.invalidConnId(offerData.connId)) {
-          // Invalid
-        } else {
-          socket.emit(signals.receivedSignal, signals.offerSignal)
-          verbose(`${signals.offerSignal} signal Recieved for ${offerData.connId} `)
-          this.io
-            .to(offerData.connId)
-            .emit(signals.offer, { data: offerData.data })
-        }
-      })
-
-      // Handle signal "answerSignal" event //
-      socket.on(signals.answerSignal, answerData => {
-        if (this.invalidConnId(answerData.connId)) {
-          // Invalid
-        } else {
-          socket.emit(signals.receivedSignal, signals.answerSignal)
-          verbose(
-            `${signals.answerSignal} signal Recieved for ${answerData.connId} `
-          )
-          this.io.to(answerData.connId).emit(signals.answer, {
-            data: answerData.data,
-            options: answerData.options
-          })
-        }
-      })
-
-      // Handle signal "rtcConnected" event //
-      socket.on(signals.rtcConnected, connId => {
-        // Clean up client record
-        socket.emit(signals.receivedSignal, signals.rtcConnected)
-        verbose(`Removing connection entry for: ${connId}`)
-        this.redis.removeConnectionEntry(connId)
-        // socket.leave(connId)
-        verbose('WebRTC CONNECTED', connId)
-      })
+      // Bind socket events //
+      socket.on(signals.signature, this.onSignature.bind(this, socket))
+      socket.on(signals.offerSignal, this.onOfferSignal.bind(this, socket))
+      socket.on(signals.answerSignal, this.onAnswerSignal.bind(this, socket))
+      socket.on(signals.rtcConnected, this.onRtcConnected.bind(this, socket))
 
       // Handle signal "disconnect" event //
       socket.on(signals.disconnect, reason => {
@@ -199,24 +191,52 @@ export default class SignalServer {
         socket.disconnect(true)
       })
     } catch (e) {
-      errorLogger.error('ioConnection:createTurnConnection', { e })
+      errorLogger.error('ioConnection', { e })
     }
   }
 
-  invalidConnId (hex) {
-    let validHex = /[0-9A-Fa-f].*/.test(hex)
-    let validLength = (hex.length === 32)
-    let result = !(validHex && validLength)
-    // console.log(result)
-    return result
+  /*
+  ===================================================================================
+    Socket Events
+  ===================================================================================
+  */
+
+  onSignature (socket, data) {
+    verbose(`${signals.signature} signal Recieved for ${data.connId} `)
+    socket.emit(signals.receivedSignal, signals.signature)
+    this.receiverConfirm(socket, data)
   }
 
-  invalidHex (hex) {
-    let validHex = /[0-9A-Fa-f].*/.test(hex)
-    return !validHex
+  onOfferSignal (socket, data) {
+    verbose(`${signals.offerSignal} signal Recieved for ${data.connId} `)
+    socket.emit(signals.receivedSignal, signals.offerSignal)
+    this.io
+      .to(data.connId)
+      .emit(signals.offer, { data: data.data })
   }
 
-  //////////////////////////////
+  onAnswerSignal (socket, data) {
+    verbose(`${signals.answerSignal} signal Recieved for ${data.connId} `)
+    socket.emit(signals.receivedSignal, signals.answerSignal)
+    this.io.to(data.connId).emit(signals.answer, {
+      data: data.data,
+      options: data.options
+    })
+  }
+
+  onRtcConnected (socket, data) {
+    verbose(`Removing connection entry for: ${data}`)
+    socket.emit(signals.receivedSignal, signals.rtcConnected)
+    this.redis.removeConnectionEntry(data)
+    verbose('WebRTC connected', data)
+  }
+
+  /*
+  ===================================================================================
+    Member Functions
+  ===================================================================================
+  */
+ 
   createTurnConnection () {
     try {
       turnLog('CREATE TURN CONNECTION')
@@ -232,10 +252,6 @@ export default class SignalServer {
   }
 
   initiatorIncomming (socket, details) {
-    /**
-     * TODO: Add property check
-     */
-
     try {
       initiatorLog(`INITIATOR CONNECTION with connection ID: ${details.connId}`)
       extraverbose('Initiator details: ', details)
@@ -342,5 +358,33 @@ export default class SignalServer {
     } catch (e) {
       errorLogger.error('receiverConfirm', { e })
     }
+  }
+
+  /*
+  ===================================================================================
+    Validation
+  ===================================================================================
+  */
+
+  async validateSignal (message, next) {
+    try {
+      await validateSignal(message)
+      return next()
+    } catch (e) {
+      return next(new Error('invalid signal or parameters'))
+    }
+  }
+
+  invalidConnId (hex) {
+    let validHex = /[0-9A-Fa-f].*/.test(hex)
+    let validLength = (hex.length === 32)
+    let result = !(validHex && validLength)
+    // console.log(result)
+    return result
+  }
+
+  invalidHex (hex) {
+    let validHex = /[0-9A-Fa-f].*/.test(hex)
+    return !validHex
   }
 }

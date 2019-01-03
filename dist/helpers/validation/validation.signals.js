@@ -3,10 +3,9 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+exports.validateSignal = undefined;
 
 var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
-
-exports.default = isValid;
 
 var _validate = require('validate');
 
@@ -42,7 +41,8 @@ var signatureValidator = new _validate2.default({
   },
   connId: {
     type: String,
-    required: true
+    required: true,
+    length: { min: 32, max: 32 }
   },
   version: {
     iv: {
@@ -135,21 +135,23 @@ var encryptedValidator = new _validate2.default({
   },
   connId: {
     type: String,
-    required: true
+    required: true,
+    length: { min: 32, max: 32 }
   }
 }, { strip: false });
 
 var tryTurnValidator = new _validate2.default({
   connId: {
     type: String,
-    required: true
+    required: true,
+    length: { min: 32, max: 32 }
   },
   cont: {
     type: Boolean
   }
 });
 
-function isValid(message) {
+var validateSignal = function validateSignal(message) {
   return new Promise(function (resolve, reject) {
     var errors = void 0;
     if (wholeEncrypted.includes(message[0])) {
@@ -177,4 +179,6 @@ function isValid(message) {
       resolve();
     }
   });
-}
+};
+
+exports.validateSignal = validateSignal;

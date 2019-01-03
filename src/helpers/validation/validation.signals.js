@@ -28,7 +28,8 @@ const signatureValidator = new Schema({
   },
   connId: {
     type: String,
-    required: true
+    required: true,
+    length: { min: 32, max: 32 }
   },
   version: {
     iv: {
@@ -122,7 +123,8 @@ const encryptedValidator = new Schema(
     },
     connId: {
       type: String,
-      required: true
+      required: true,
+      length: { min: 32, max: 32 }
     }
   },
   { strip: false }
@@ -131,14 +133,15 @@ const encryptedValidator = new Schema(
 const tryTurnValidator = new Schema({
   connId: {
     type: String,
-    required: true
+    required: true,
+    length: { min: 32, max: 32 }
   },
   cont: {
     type: Boolean
   }
 })
 
-export default function isValid (message) {
+const validateSignal = (message) => {
   return new Promise((resolve, reject) => {
     let errors
     if (wholeEncrypted.includes(message[0])) {
@@ -167,3 +170,5 @@ export default function isValid (message) {
     }
   })
 }
+
+export { validateSignal }
