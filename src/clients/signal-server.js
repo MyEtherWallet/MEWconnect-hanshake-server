@@ -115,7 +115,6 @@ export default class SignalServer {
       const stage = token.stage || false
       const connId = token.connId || false
 
-
       // ERROR: invalid connection id //
       /**
        * Todo: doesn't check for proper connId, can add random strings
@@ -145,31 +144,43 @@ export default class SignalServer {
 
       // Handle signal "signature" event //
       socket.on(signals.signature, data => {
-        socket.emit(signals.receivedSignal, signals.signature)
-        verbose(`${signals.signature} signal Recieved for ${data.connId} `)
-        extraverbose('Recieved: ', signals.signature)
-        this.receiverConfirm(socket, data)
+        if (this.invalidConnId(data.connId)) {
+          // Invalid
+        } else {
+          socket.emit(signals.receivedSignal, signals.signature)
+          verbose(`${signals.signature} signal Recieved for ${data.connId} `)
+          extraverbose('Recieved: ', signals.signature)
+          this.receiverConfirm(socket, data)
+        }
       })
 
       // Handle signal "offerSignal" event //
       socket.on(signals.offerSignal, offerData => {
-        socket.emit(signals.receivedSignal, signals.offerSignal)
-        verbose(`${signals.offerSignal} signal Recieved for ${offerData.connId} `)
-        this.io
-          .to(offerData.connId)
-          .emit(signals.offer, { data: offerData.data })
+        if (this.invalidConnId(offerData.connId)) {
+          // Invalid
+        } else {
+          socket.emit(signals.receivedSignal, signals.offerSignal)
+          verbose(`${signals.offerSignal} signal Recieved for ${offerData.connId} `)
+          this.io
+            .to(offerData.connId)
+            .emit(signals.offer, { data: offerData.data })
+        }
       })
 
       // Handle signal "answerSignal" event //
       socket.on(signals.answerSignal, answerData => {
-        socket.emit(signals.receivedSignal, signals.answerSignal)
-        verbose(
-          `${signals.answerSignal} signal Recieved for ${answerData.connId} `
-        )
-        this.io.to(answerData.connId).emit(signals.answer, {
-          data: answerData.data,
-          options: answerData.options
-        })
+        if (this.invalidConnId(answerData.connId)) {
+          // Invalid
+        } else {
+          socket.emit(signals.receivedSignal, signals.answerSignal)
+          verbose(
+            `${signals.answerSignal} signal Recieved for ${answerData.connId} `
+          )
+          this.io.to(answerData.connId).emit(signals.answer, {
+            data: answerData.data,
+            options: answerData.options
+          })
+        }
       })
 
       // Handle signal "rtcConnected" event //
@@ -196,6 +207,7 @@ export default class SignalServer {
     let validHex = /[0-9A-Fa-f].*/.test(hex)
     let validLength = (hex.length === 32)
     let result = !(validHex && validLength)
+    // console.log(result)
     return result
   }
 
@@ -228,6 +240,7 @@ export default class SignalServer {
       initiatorLog(`INITIATOR CONNECTION with connection ID: ${details.connId}`)
       extraverbose('Initiator details: ', details)
       if (this.invalidHex(socket.id)) throw new Error('Connection attempted to pass an invalid socket ID')
+      if (!details.signed) throw new Error('Connection attempt missing a valid signed parameter')
       this.redis.createConnectionEntry(details, socket.id).then(() => {
         socket.join(details.connId)
         socket.emit(signals.initiated, details)
@@ -240,6 +253,7 @@ export default class SignalServer {
   receiverIncomming(socket, details) {
     try {
       receiverLog(`RECEIVER CONNECTION for ${details.connId}`)
+      if (!details.signed) throw new Error('Connection attempt missing a valid signed parameter')
       if (this.invalidConnId(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID')
       this.redis.locateMatchingConnection(details.connId).then(_result => {
         if (_result) {

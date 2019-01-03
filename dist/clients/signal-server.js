@@ -184,27 +184,39 @@ var SignalServer = function () {
 
         // Handle signal "signature" event //
         socket.on(_config.signals.signature, function (data) {
-          socket.emit(_config.signals.receivedSignal, _config.signals.signature);
-          verbose(_config.signals.signature + ' signal Recieved for ' + data.connId + ' ');
-          extraverbose('Recieved: ', _config.signals.signature);
-          _this.receiverConfirm(socket, data);
+          if (_this.invalidConnId(data.connId)) {
+            // Invalid
+          } else {
+            socket.emit(_config.signals.receivedSignal, _config.signals.signature);
+            verbose(_config.signals.signature + ' signal Recieved for ' + data.connId + ' ');
+            extraverbose('Recieved: ', _config.signals.signature);
+            _this.receiverConfirm(socket, data);
+          }
         });
 
         // Handle signal "offerSignal" event //
         socket.on(_config.signals.offerSignal, function (offerData) {
-          socket.emit(_config.signals.receivedSignal, _config.signals.offerSignal);
-          verbose(_config.signals.offerSignal + ' signal Recieved for ' + offerData.connId + ' ');
-          _this.io.to(offerData.connId).emit(_config.signals.offer, { data: offerData.data });
+          if (_this.invalidConnId(offerData.connId)) {
+            // Invalid
+          } else {
+            socket.emit(_config.signals.receivedSignal, _config.signals.offerSignal);
+            verbose(_config.signals.offerSignal + ' signal Recieved for ' + offerData.connId + ' ');
+            _this.io.to(offerData.connId).emit(_config.signals.offer, { data: offerData.data });
+          }
         });
 
         // Handle signal "answerSignal" event //
         socket.on(_config.signals.answerSignal, function (answerData) {
-          socket.emit(_config.signals.receivedSignal, _config.signals.answerSignal);
-          verbose(_config.signals.answerSignal + ' signal Recieved for ' + answerData.connId + ' ');
-          _this.io.to(answerData.connId).emit(_config.signals.answer, {
-            data: answerData.data,
-            options: answerData.options
-          });
+          if (_this.invalidConnId(answerData.connId)) {
+            // Invalid
+          } else {
+            socket.emit(_config.signals.receivedSignal, _config.signals.answerSignal);
+            verbose(_config.signals.answerSignal + ' signal Recieved for ' + answerData.connId + ' ');
+            _this.io.to(answerData.connId).emit(_config.signals.answer, {
+              data: answerData.data,
+              options: answerData.options
+            });
+          }
         });
 
         // Handle signal "rtcConnected" event //
@@ -232,6 +244,7 @@ var SignalServer = function () {
       var validHex = /[0-9A-Fa-f].*/.test(hex);
       var validLength = hex.length === 32;
       var result = !(validHex && validLength);
+      // console.log(result)
       return result;
     }
   }, {
@@ -269,6 +282,7 @@ var SignalServer = function () {
         initiatorLog('INITIATOR CONNECTION with connection ID: ' + details.connId);
         extraverbose('Initiator details: ', details);
         if (this.invalidHex(socket.id)) throw new Error('Connection attempted to pass an invalid socket ID');
+        if (!details.signed) throw new Error('Connection attempt missing a valid signed parameter');
         this.redis.createConnectionEntry(details, socket.id).then(function () {
           socket.join(details.connId);
           socket.emit(_config.signals.initiated, details);
@@ -284,6 +298,7 @@ var SignalServer = function () {
 
       try {
         receiverLog('RECEIVER CONNECTION for ' + details.connId);
+        if (!details.signed) throw new Error('Connection attempt missing a valid signed parameter');
         if (this.invalidConnId(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
         this.redis.locateMatchingConnection(details.connId).then(function (_result) {
           if (_result) {

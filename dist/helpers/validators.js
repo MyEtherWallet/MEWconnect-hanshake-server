@@ -161,11 +161,8 @@ function isValid(message) {
     } else if (message[0] === tryTurn) {
       errors = tryTurnValidator.validate(message[1]);
     } else {
-      console.log('reject');
       reject();
     }
-
-    console.log(errors);
 
     if (message[1].options !== undefined && message[1].options !== null) {
       if (!optionsCheck(message[1].options)) {

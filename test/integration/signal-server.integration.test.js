@@ -199,23 +199,26 @@ describe('Signal Server', () => {
     })
 
     /**
-     * After each test, stop listening to signals.receivedSignal event.
+     * After each test, stop listening to each signal event
      * Each discrete test will listen to this event if need be.
      */
     afterEach(async done => {
-      if (initiator.socket.connected) await initiator.socket.off(signals.receivedSignal)
-      if (receiver.socket.connected) await receiver.socket.off(signals.receivedSignal)
+      Object.keys(signals).forEach(async key => {
+        let signal = signals[key]
+        if (initiator.socket.connected) await initiator.socket.off(signal)
+        if (receiver.socket.connected) await receiver.socket.off(signal)
+      })
       done()
     })
 
     /**
      * After all tests are completed, close socket connections.
      */
-    // afterAll(async done => {
-    //   await disconnect(initiator.socket)
-    //   await disconnect(receiver.socket)
-    //   done()
-    // })
+    afterAll(async done => {
+      await disconnect(initiator.socket)
+      await disconnect(receiver.socket)
+      done()
+    })
 
     /*
     ===================================================================================
@@ -232,7 +235,7 @@ describe('Signal Server', () => {
         let message
         let connectionOptions
 
-        beforeEach(() => {
+        beforeAll(() => {
           message = CryptoUtils.generateRandomMessage()
           connectionOptions = {
             query: {
@@ -335,7 +338,6 @@ describe('Signal Server', () => {
             }
             initiator.socket = await connect(options)
             initiator.socket.on(signals.initiated, async data => {
-              console.log('Initiate success', initiator.socket.id)
               done()
             })
           })
@@ -350,7 +352,7 @@ describe('Signal Server', () => {
       describe('Handshake [Server → Receiver]', () => {
         let connectionOptions
 
-        beforeEach(() => {
+        beforeAll(() => {
           connectionOptions = {
             query: {
               stage: stages.receiver,
@@ -459,13 +461,14 @@ describe('Signal Server', () => {
       describe('Signature [Receiver → Server]', () => {
         let signaturePayload
 
-        beforeEach(() => {
+        beforeAll(() => {
           signaturePayload = {
             signed: signed,
             connId: connId,
             version: versionObject
           }
         })
+
         /*
         ===================================================================================
           2a-3. Pairing -> Initial Signaling -> Signature [Receiver → Server] -> FAIL
@@ -602,6 +605,79 @@ describe('Signal Server', () => {
         ===================================================================================
       */
       describe('OfferSignal [Initiator → Server]', () => {
+        let encryptedData
+        let offerPayload
+
+        beforeAll(async (done) => {
+          encryptedData = await CryptoUtils.encrypt(version, privateKey)
+          offerPayload = {
+            data: encryptedData,
+            connId: connId,
+            options: stunServers
+          }
+          done()
+        })
+
+        /*
+          ===================================================================================
+            2b-1. Pairing -> Offer Creation -> OfferSignal [Initiator → Server] -> FAIL
+          ===================================================================================
+        */
+        describe('<FAIL>', () => {
+          it('Should not connect with missing @data property', async done => {
+            let payload = _.cloneDeep(offerPayload)
+            delete payload.data
+            initiator.socket.binary(false).emit(signals.offerSignal, payload)
+
+            // Fail on signal that would indicate success //
+            initiator.socket.on(signals.receivedSignal, async data => {
+              throw new Error('Connected with missing @data property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
+          it('Should not connect with invalid @data property', async done => {
+            let payload = _.cloneDeep(offerPayload)
+            payload.data = 'invalid'
+            initiator.socket.binary(false).emit(signals.offerSignal, payload)
+
+            // Fail on signal that would indicate success //
+            initiator.socket.on(signals.receivedSignal, async data => {
+              throw new Error('Connected with invalid @data property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
+          it('Should not connect with missing @connId property', async done => {
+            let payload = _.cloneDeep(offerPayload)
+            delete payload.connId
+            initiator.socket.binary(false).emit(signals.offerSignal, payload)
+
+            // Fail on signal that would indicate success //
+            initiator.socket.on(signals.receivedSignal, async data => {
+              throw new Error('Connected with missing @connId property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
+          it('Should not connect with invalid @connId property', async done => {
+            let payload = _.cloneDeep(offerPayload)
+            payload.connId = 'invalid'
+            initiator.socket.binary(false).emit(signals.offerSignal, payload)
+
+            // Fail on signal that would indicate success //
+            initiator.socket.on(signals.receivedSignal, async data => {
+              throw new Error('Connected with invalid @connId property')
+            })
+
+            // Pass after timeout //
+            pass(done)
+          })
+        })
+
         /*
           ===================================================================================
             2b-1. Pairing -> Offer Creation -> OfferSignal [Initiator → Server] -> SUCCESS
@@ -628,11 +704,9 @@ describe('Signal Server', () => {
               )
 
               // Emit offer signal for receiver //
-              initiator.socket.binary(false).emit(signals.offerSignal, {
-                data: encryptedSend,
-                connId: connId,
-                options: stunServers
-              })
+              let payload = _.cloneDeep(offerPayload)
+              payload.data = encryptedSend
+              initiator.socket.binary(false).emit(signals.offerSignal, payload)
 
               // Listen for confirmation SignalServer received signal //
               initiator.socket.on(signals.receivedSignal, signal => {
@@ -692,6 +766,18 @@ describe('Signal Server', () => {
         ===================================================================================
       */
       describe('AnswerSignal [Receiver → Server]', () => {
+        let encryptedData
+        let answerPayload
+
+        beforeAll(async (done) => {
+          encryptedData = await CryptoUtils.encrypt(version, privateKey)
+          answerPayload = {
+            data: encryptedData,
+            connId: connId
+          }
+          done()
+        })
+
         /*
           ===================================================================================
             2c-1. Pairing -> Answer Creation -> AnswerSignal [Receiver → Server] -> FAIL
@@ -699,13 +785,11 @@ describe('Signal Server', () => {
         */
         describe('<FAIL>', () => {
           it('Should not connect with missing @data property', async done => {
-            // Emit offer signal for receiver //
-            receiver.socket.binary(false).emit(signals.answerSignal, {
-              // data: encryptedSend,
-              connId: connId
-            })
+            let payload = _.cloneDeep(answerPayload)
+            delete payload.data
+            receiver.socket.binary(false).emit(signals.answerSignal, payload)
 
-            // Listen for confirmation SignalServer received signal //
+            // Fail on signal that would indicate success //
             receiver.socket.on(signals.receivedSignal, signal => {
               throw new Error('Connected with missing @data property')
             })
@@ -713,15 +797,12 @@ describe('Signal Server', () => {
             // Pass after timeout //
             pass(done)
           })
-
           it('Should not connect with invalid @data property', async done => {
-            // Emit offer signal for receiver //
-            receiver.socket.binary(false).emit(signals.answerSignal, {
-              data: 'invalid',
-              connId: connId
-            })
+            let payload = _.cloneDeep(answerPayload)
+            payload.data = 'invalid'
+            receiver.socket.binary(false).emit(signals.answerSignal, payload)
 
-            // Listen for confirmation SignalServer received signal //
+            // Fail on signal that would indicate success //
             receiver.socket.on(signals.receivedSignal, signal => {
               throw new Error('Connected with invalid @data property')
             })
@@ -729,17 +810,12 @@ describe('Signal Server', () => {
             // Pass after timeout //
             pass(done)
           })
-
           it('Should not connect with missing @connId property', async done => {
-            let encryptedSend = await CryptoUtils.encrypt(version, privateKey)
+            let payload = _.cloneDeep(answerPayload)
+            delete payload.connId
+            receiver.socket.binary(false).emit(signals.answerSignal, payload)
 
-            // Emit offer signal for receiver //
-            receiver.socket.binary(false).emit(signals.answerSignal, {
-              data: encryptedSend
-              // connId: connId
-            })
-
-            // Listen for confirmation SignalServer received signal //
+            // Fail on signal that would indicate success //
             receiver.socket.on(signals.receivedSignal, signal => {
               throw new Error('Connected with missing @connId property')
             })
@@ -747,24 +823,19 @@ describe('Signal Server', () => {
             // Pass after timeout //
             pass(done)
           })
+          it('Should not connect with invalid @connId property', async done => {
+            let payload = _.cloneDeep(answerPayload)
+            payload.connId = 'invalid'
+            receiver.socket.binary(false).emit(signals.answerSignal, payload)
 
-          // it('Should not connect with invalid @connId property', async done => {
-          //   let encryptedSend = await CryptoUtils.encrypt(version, privateKey)
+            // Fail on signal that would indicate success //
+            receiver.socket.on(signals.receivedSignal, signal => {
+              throw new Error('Connected with invalid @connId property')
+            })
 
-          //   // Emit offer signal for receiver //
-          //   receiver.socket.binary(false).emit(signals.answerSignal, {
-          //     data: encryptedSend,
-          //     connId: 'invalid'
-          //   })
-
-          //   // Listen for confirmation SignalServer received signal //
-          //   receiver.socket.on(signals.receivedSignal, signal => {
-          //     throw new Error('Connected with invalid @connId property')
-          //   })
-
-          //   // Pass after timeout //
-          //   pass(done)
-          // })
+            // Pass after timeout //
+            pass(done)
+          })
         })
 
         /*
@@ -787,11 +858,10 @@ describe('Signal Server', () => {
                 privateKey
               )
 
-              // Emit offer signal for receiver //
-              receiver.socket.binary(false).emit(signals.answerSignal, {
-                data: encryptedSend,
-                connId: connId
-              })
+              // Emit answer signal for initiator //
+              let payload = _.cloneDeep(answerPayload)
+              payload.data = encryptedSend
+              receiver.socket.binary(false).emit(signals.answerSignal, payload)
 
               // Listen for confirmation SignalServer received signal //
               receiver.socket.on(signals.receivedSignal, signal => {
