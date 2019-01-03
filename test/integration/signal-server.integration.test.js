@@ -21,8 +21,6 @@ import RedisClient from '@clients/redis-client'
 |
 |--------------------------------------------------------------------------
 |
-| 12/18/2018
-|
 | The goal of these integration tests are to ensure the functionality of the SignalServer.
 | The SignalServer attempts to pair two "signaling" peers together via a secure Socket.io connection.
 | These peers will then establish a webRTC connection to each other, allowing

@@ -73,25 +73,12 @@ var extraverbose = (0, _debug2.default)('verbose');
 |
 |--------------------------------------------------------------------------
 |
-| 12/18/2018
-|
-| The goal of these integration tests are to ensure the functionality of the SignalServer.
 | The SignalServer attempts to pair two "signaling" peers together via a secure Socket.io connection.
 | These peers will then establish a webRTC connection to each other, allowing
 | secure communication using the credentials created during the pairing process.
 |
-| The tests attempt to mirror the process defined in the following documentation outline:
+| The SignalServer performs the "pairing" process defined in the following documentation outline:
 | https://docs.google.com/document/d/19acrYB3iLT4j9JDg0xGcccLXFenqfSlNiKVpXOdLL6Y
-|
-| There are (2) primary processes that must be tested, the majority of which occurs in the
-| "Pairing" section:
-|
-| 1. Initialization
-  2. Pairing
-|     a. Initial Signaling
-|     b. Offer Creation
-|     c. Answer Creation
-|     d. RTC Connection
 |
 */
 
@@ -221,12 +208,7 @@ var SignalServer = function () {
         socket.on(_config.signals.offerSignal, this.onOfferSignal.bind(this, socket));
         socket.on(_config.signals.answerSignal, this.onAnswerSignal.bind(this, socket));
         socket.on(_config.signals.rtcConnected, this.onRtcConnected.bind(this, socket));
-
-        // Handle signal "disconnect" event //
-        socket.on(_config.signals.disconnect, function (reason) {
-          verbose('disconnect reason: ', reason);
-          socket.disconnect(true);
-        });
+        socket.on(_config.signals.disconnect, this.onDisconnect.bind(this, socket));
       } catch (e) {
         errorLogger.error('ioConnection', { e: e });
       }
@@ -241,6 +223,7 @@ var SignalServer = function () {
   }, {
     key: 'onSignature',
     value: function onSignature(socket, data) {
+      console.log('SIGNATURE', data);
       verbose(_config.signals.signature + ' signal Recieved for ' + data.connId + ' ');
       socket.emit(_config.signals.receivedSignal, _config.signals.signature);
       this.receiverConfirm(socket, data);
@@ -248,6 +231,7 @@ var SignalServer = function () {
   }, {
     key: 'onOfferSignal',
     value: function onOfferSignal(socket, data) {
+      console.log('OFFER', data);
       verbose(_config.signals.offerSignal + ' signal Recieved for ' + data.connId + ' ');
       socket.emit(_config.signals.receivedSignal, _config.signals.offerSignal);
       this.io.to(data.connId).emit(_config.signals.offer, { data: data.data });
@@ -255,6 +239,7 @@ var SignalServer = function () {
   }, {
     key: 'onAnswerSignal',
     value: function onAnswerSignal(socket, data) {
+      console.log('ANSWER', data);
       verbose(_config.signals.answerSignal + ' signal Recieved for ' + data.connId + ' ');
       socket.emit(_config.signals.receivedSignal, _config.signals.answerSignal);
       this.io.to(data.connId).emit(_config.signals.answer, {
@@ -265,10 +250,17 @@ var SignalServer = function () {
   }, {
     key: 'onRtcConnected',
     value: function onRtcConnected(socket, data) {
+      console.log('RTC', data);
       verbose('Removing connection entry for: ' + data);
       socket.emit(_config.signals.receivedSignal, _config.signals.rtcConnected);
       this.redis.removeConnectionEntry(data);
       verbose('WebRTC connected', data);
+    }
+  }, {
+    key: 'onDisconnect',
+    value: function onDisconnect(socket, data) {
+      verbose('disconnect reason: ', data);
+      socket.disconnect(true);
     }
 
     /*

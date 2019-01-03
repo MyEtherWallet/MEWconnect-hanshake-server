@@ -43,25 +43,12 @@ const extraverbose = debug('verbose')
 |
 |--------------------------------------------------------------------------
 |
-| 12/18/2018
-|
-| The goal of these integration tests are to ensure the functionality of the SignalServer.
 | The SignalServer attempts to pair two "signaling" peers together via a secure Socket.io connection.
 | These peers will then establish a webRTC connection to each other, allowing
 | secure communication using the credentials created during the pairing process.
 |
-| The tests attempt to mirror the process defined in the following documentation outline:
+| The SignalServer performs the "pairing" process defined in the following documentation outline:
 | https://docs.google.com/document/d/19acrYB3iLT4j9JDg0xGcccLXFenqfSlNiKVpXOdLL6Y
-|
-| There are (2) primary processes that must be tested, the majority of which occurs in the
-| "Pairing" section:
-|
-| 1. Initialization
-  2. Pairing
-|     a. Initial Signaling
-|     b. Offer Creation
-|     c. Answer Creation
-|     d. RTC Connection
 |
 */
 
@@ -146,7 +133,8 @@ export default class SignalServer {
   /**
    * Middleware to handle the initial socket on "connection" event from a client.
    * 1. Validate signal parameters
-   * 2. Identify client as a "initiatior" or "receiver" depending on their handshake.query parameters
+   * 2. Identify client as a "initiatior" or "receiver" depending
+   *    on their handshake.query parameters
    * 3. Bind events to handle each signal request from a client
    */
   ioConnection (socket) {
@@ -184,12 +172,7 @@ export default class SignalServer {
       socket.on(signals.offerSignal, this.onOfferSignal.bind(this, socket))
       socket.on(signals.answerSignal, this.onAnswerSignal.bind(this, socket))
       socket.on(signals.rtcConnected, this.onRtcConnected.bind(this, socket))
-
-      // Handle signal "disconnect" event //
-      socket.on(signals.disconnect, reason => {
-        verbose('disconnect reason: ', reason)
-        socket.disconnect(true)
-      })
+      socket.on(signals.disconnect, this.onDisconnect.bind(this, socket))
     } catch (e) {
       errorLogger.error('ioConnection', { e })
     }
@@ -201,12 +184,38 @@ export default class SignalServer {
   ===================================================================================
   */
 
+  /**
+   * Identity confirmation credentials supplied to server for validation against credentials
+   * initially supplied to the server by the initiator
+   *
+   * @param {Object} socket - Client's socket connection object
+   * @param {Object} data - Message payload sent by client
+   * @param {String} data.signed - Private key signed with the private key created
+   *                               for the connection
+   * @param {String} data.connId - Last 32 characters of the public key portion of the key-pair
+   *                               created for the particular paired connection
+   * @param {Object} data.version - Version-string encrypted object using eccrypto
+   */
   onSignature (socket, data) {
     verbose(`${signals.signature} signal Recieved for ${data.connId} `)
     socket.emit(signals.receivedSignal, signals.signature)
     this.receiverConfirm(socket, data)
   }
 
+  /**
+   * Initiator sends an encrypted webRTC connection offer to be retransmitted to the receiver
+   *
+   * @param {Object} socket - Client's socket connection object
+   * @param {Object} data - Message payload sent by client
+   * @param {String} data.data - Encrypted WebRTC offer object using eccrypto
+   *                             as string (Stringified JSON)
+   * @param {String} data.connId - Last 32 characters of the public key portion of the key-pair
+   *                               created for the particular paired connection
+   * @param {Array} data.options - JSONArray of STUN or TURN server details (not encrypted)
+   *                               STUN server format: [{url: “details”}, ...]
+   *                               TURN server format: [{url: “url”,
+   *                               username: “username”, credential: “credential”}, ...]
+   */
   onOfferSignal (socket, data) {
     verbose(`${signals.offerSignal} signal Recieved for ${data.connId} `)
     socket.emit(signals.receivedSignal, signals.offerSignal)
@@ -215,6 +224,16 @@ export default class SignalServer {
       .emit(signals.offer, { data: data.data })
   }
 
+  /**
+   * Receiver sends webRTC connection answer to be retransmitted to the initiator
+   *
+   * @param {Object} socket - Client's socket connection object
+   * @param {Object} data - Message payload sent by client
+   * @param {String} data.data - Encrypted WebRTC answer object using eccrypto
+   *                             as string (Stringified JSON)
+   * @param {String} data.connId - Last 32 characters of the public key portion of the key-pair
+   *                               created for the particular paired connection
+   */
   onAnswerSignal (socket, data) {
     verbose(`${signals.answerSignal} signal Recieved for ${data.connId} `)
     socket.emit(signals.receivedSignal, signals.answerSignal)
@@ -224,11 +243,33 @@ export default class SignalServer {
     })
   }
 
-  onRtcConnected (socket, data) {
-    verbose(`Removing connection entry for: ${data}`)
+  /**
+   * Initiator and receiver send confirmation that they have both connected via webRTC,
+   * in order for their socket.io pairing to be cleaned up. Since they are both connected via
+   * a peer-to-peer connection, the SignalServer is no longer required.
+   *
+   * @param {Object} socket - Client's socket connection object
+   * @param {String} connId - Message payload sent by client.
+   *                          In this case, it is the @connId:
+   *                          Last 32 characters of the public key portion of the key-pair
+   *                          created for the particular paired connection
+   */
+  onRtcConnected (socket, connId) {
+    verbose(`Removing connection entry for: ${connId}`)
     socket.emit(signals.receivedSignal, signals.rtcConnected)
-    this.redis.removeConnectionEntry(data)
-    verbose('WebRTC connected', data)
+    this.redis.removeConnectionEntry(connId)
+    verbose('WebRTC connected', connId)
+  }
+
+  /**
+   * Log client disconnect
+   *
+   * @param {Object} socket - Client's socket connection object
+   * @param {String} data - Reason for disconnect
+   */
+  onDisconnect (socket, data) {
+    verbose('Disconnect reason: ', data)
+    socket.disconnect(true)
   }
 
   /*
@@ -236,7 +277,6 @@ export default class SignalServer {
     Member Functions
   ===================================================================================
   */
- 
   createTurnConnection () {
     try {
       turnLog('CREATE TURN CONNECTION')
