@@ -16,10 +16,6 @@ var _debug = require('debug');
 
 var _debug2 = _interopRequireDefault(_debug);
 
-var _dotenv = require('dotenv');
-
-var _dotenv2 = _interopRequireDefault(_dotenv);
-
 var _http = require('http');
 
 var _http2 = _interopRequireDefault(_http);
@@ -164,6 +160,25 @@ var SignalServer = function () {
       Connection Middleware
     ===================================================================================
     */
+
+    /**
+     * Validate that an incoming signal from a client
+     * has the necessary and correctly-formatted parameters
+     *
+     * @param  {Object} message - Client signal/message payload
+     * @param  {Function} next - Socket.IO middleware continue function (required)
+     */
+
+  }, {
+    key: 'validateSignal',
+    value: async function validateSignal(message, next) {
+      try {
+        await (0, _validation.validateSignal)(message);
+        return next();
+      } catch (e) {
+        return next(new Error('invalid signal or parameters'));
+      }
+    }
 
     /**
      * Middleware to handle the initial socket on "connection" event from a client.
@@ -433,7 +448,7 @@ var SignalServer = function () {
 
       try {
         receiverLog('RECEIVER CONFIRM: ', details.connId);
-        if (this.invalidConnId(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
+        if (!(0, _validation.validConnId)(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
         this.redis.locateMatchingConnection(details.connId).then(function (_result) {
           receiverLog('Located Matching Connection for ' + details.connId);
           verbose(_result);
@@ -483,31 +498,6 @@ var SignalServer = function () {
     ===================================================================================
     */
 
-  }, {
-    key: 'validateSignal',
-    value: async function validateSignal(message, next) {
-      try {
-        await (0, _validation.validateSignal)(message);
-        return next();
-      } catch (e) {
-        return next(new Error('invalid signal or parameters'));
-      }
-    }
-  }, {
-    key: 'invalidConnId',
-    value: function invalidConnId(hex) {
-      var validHex = /[0-9A-Fa-f].*/.test(hex);
-      var validLength = hex.length === 32;
-      var result = !(validHex && validLength);
-      // console.log(result)
-      return result;
-    }
-  }, {
-    key: 'invalidHex',
-    value: function invalidHex(hex) {
-      var validHex = /[0-9A-Fa-f].*/.test(hex);
-      return !validHex;
-    }
   }]);
 
   return SignalServer;

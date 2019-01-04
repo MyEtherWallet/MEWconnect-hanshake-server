@@ -4,7 +4,11 @@
 
 require('module-alias/register');
 
-var _signalServer = require('@/clients/signal-server');
+var _dotenv = require('dotenv');
+
+var _dotenv2 = _interopRequireDefault(_dotenv);
+
+var _signalServer = require('@clients/signal-server');
 
 var _signalServer2 = _interopRequireDefault(_signalServer);
 

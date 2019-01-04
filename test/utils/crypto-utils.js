@@ -8,6 +8,7 @@ import secp256k1 from 'secp256k1'
 export default (() => {
   /**
    * Generate a public/private keypair using secp256k1
+   *
    * @return {Object} - publicKey/privateKey object
    */
   const generateKeys = () => {
@@ -21,6 +22,7 @@ export default (() => {
 
   /**
    * Generate a connId using given a public key
+   *
    * @param  {String} publicKey - publicKey string (usually generated with generateKeys())
    * @return {String} - connId string
    */
@@ -30,6 +32,7 @@ export default (() => {
 
   /**
    * Generate a random message of 32 bytes
+   *
    * @return {String} - The randomly generated string
    */
   const generateRandomMessage = () => {
@@ -38,6 +41,7 @@ export default (() => {
 
   /**
    * Sign a message using a privateKey
+   *
    * @param  {String} msg - Message to sign/hash
    * @param  {[type]} privateKey - Private key (usually generated with generateKeys())
    * @return {String} - Signed message
@@ -59,6 +63,7 @@ export default (() => {
 
   /**
    * Encrypt a set of data given a private key using eccrypto
+   *
    * @param  {Object/String} data - Data to encrypt
    * @param  {String} privateKey - Private key (usually generated with generateKeys())
    * @return {Object} - Encrypted data object with the following properties:
@@ -80,6 +85,7 @@ export default (() => {
 
   /**
    * Decrypt an encrypted data object given a private key using eccrypto
+   *
    * @param  {Object} data - An encrypted data object (usually using the encrypt() function)
    * @param  {String} privateKey - Private key (usually generated with generateKeys())
    * @return {Object} - Decrypted data

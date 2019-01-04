@@ -390,7 +390,7 @@ export default class SignalServer {
   receiverConfirm(socket, details) {
     try {
       receiverLog('RECEIVER CONFIRM: ', details.connId)
-      if (this.invalidConnId(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID')
+      if (!validConnId(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID')
       this.redis
         .locateMatchingConnection(details.connId)
         .then(_result => {
