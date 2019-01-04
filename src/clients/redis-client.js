@@ -35,7 +35,6 @@ export default class RedisClient {
    * @param {Integer} options.db - Redis DB to connect to
    */
   constructor (options = {}) {
-    // Instantiate member variable options //
     this.options = options
 
     // Options will either be set in constructor or default to those defined in @/config //
@@ -101,10 +100,18 @@ export default class RedisClient {
   ===================================================================================
   */
 
-  disconnect () {
-    this.client.disconnect()
-  }
-
+  /**
+   * Create an entry in Redis when an initiator initially connects, and store
+   * information pertinent to matching a valid receiver with said initiator.
+   *
+   * @param {Object} details - Query payload sent by the initiator on initial connection attempt
+   * @param {String} details.signed - Private key signed with the private key created
+   *                                  for the connection
+   * @param {String} details.connId - Last 32 characters of the public key portion of the key-pair
+   *                                  created for the particular paired connection
+   * @param {String} socketId - Socket.io socket.id of the initiator
+   * @return {Boolean} - True/false if the entry has been successfully created
+   */
   async createConnectionEntry (details, socketId) {
     const connId = details.connId
     const message = details.message
@@ -125,24 +132,59 @@ export default class RedisClient {
       tryTurnSignalCount
     ]
 
+    // Confirm required parameters are assigned //
+    if (!connId || !message || !initialSigned || !initiator) {
+      return false
+    }
+
+    // Write to Redis and set expiry time //
     try {
       let result = await this.client.hset(connId, hsetArgs)
-      await this.client.expire(connId, this.timeout)
-      return result
+      await this.client.expire(connId, this.options.timeout)
+      return (result >= 5)
     } catch (e) {
       infoLogger.error('createConnectionEntry', { e })
+      return false
     }
   }
 
+  /**
+   * Attempt to locate an existing Redis entry with the key @connId.
+   * Returns true/false if found or not.
+   *
+   * @param  {String} connId - Last 32 characters of the public key portion of the key-pair
+   *                           created for the particular paired connection
+   * @return {Boolean} - True if connection found, false if not
+   */
   async locateMatchingConnection (connId) {
+    if (!connId) return false
     let result = await this.client.exists(connId)
     return result === 1
   }
 
+  /**
+   * Get and return a particular Redis entry with key @connId
+   *
+   * @param  {String} connId - Last 32 characters of the public key portion of the key-pair
+   *                           created for the particular paired connection
+   * @return {Object} - The connection entry object created with createConnectionEntry()
+   *                    (and possibly modified with updateConnectionEntry())
+   */
   async getConnectionEntry (connId) {
     return this.client.hgetall(connId)
   }
 
+  /**
+   * Check if a @sig provided matches the initialSigned property originally created
+   * by the initiator with createConnectionEntry() for a particular @connId key.
+   *
+   * @param  {String} connId - Last 32 characters of the public key portion of the key-pair
+   *                           created for the particular paired connection
+   * @param  {String} sig - Signature provided (by the receiver). It should be the private key
+   *                        signed with the private key created for the connection.
+   * @return {[Boolean} - True/false whether or not the initial signature matches that of the
+   *                      signature provided by the receiver.
+   */
   async verifySig (connId, sig) {
     try {
       let connectionEntry = await this.getConnectionEntry(connId)
@@ -155,6 +197,15 @@ export default class RedisClient {
     }
   }
 
+  /**
+   * Update a Redis entry originally created with createConnectionEntry()
+   * with details of the receiver.
+   *
+   * @param  {String} connId - Last 32 characters of the public key portion of the key-pair
+   *                           created for the particular paired connection
+   * @param {String} socketId - Socket.io socket.id of the receiver
+   * @return {Boolean} - True/false if connection entry has been successfully updated or not
+   */
   async updateConnectionEntry (connId, socketId) {
     try {
       let receiverExists = await this.client.hexists(connId, 'receiver')
@@ -169,6 +220,13 @@ export default class RedisClient {
     }
   }
 
+  /**
+   * Remove a particular connection entry from Redis.
+   *
+   * @param  {String} connId - Last 32 characters of the public key portion of the key-pair
+   *                           created for the particular paired connection
+   * @return {Boolean} - True/false if successfully removed or not
+   */
   async removeConnectionEntry (connId) {
     let result = await this.client
       .hdel(
@@ -180,6 +238,10 @@ export default class RedisClient {
         'tryTurnSignalCount'
       )
     return (result >= 3)
+  }
+
+  disconnect () {
+    this.client.disconnect()
   }
 
   updateTurnStatus(connId) {

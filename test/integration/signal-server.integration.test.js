@@ -149,24 +149,26 @@ describe('Signal Server', () => {
   ===================================================================================
   */
   describe('Initilization', () => {
-    it('Should properly initialize', async () => {
-      await signalServer.init()
+    describe('<SUCCESS>', () => {
+      it('Should properly initialize', async () => {
+        await signalServer.init()
 
-      // HTTP Server //
-      const serverAddress = signalServer.server.address()
-      expect(typeof serverAddress).toBe('object')
-      expect(serverAddress.address).toEqual(serverConfig.host)
-      expect(serverAddress.port).toEqual(serverConfig.port)
+        // HTTP Server //
+        const serverAddress = signalServer.server.address()
+        expect(typeof serverAddress).toBe('object')
+        expect(serverAddress.address).toEqual(serverConfig.host)
+        expect(serverAddress.port).toEqual(serverConfig.port)
 
-      // Redis //
-      expect(signalServer.redis instanceof RedisClient).toBe(true)
-      const client = signalServer.redis.client
-      expect(client instanceof Redis).toBe(true)
-      expect(client.options.host).toEqual(redisConfig.host)
-      expect(client.options.port).toEqual(redisConfig.port)
+        // Redis //
+        expect(signalServer.redis instanceof RedisClient).toBe(true)
+        const client = signalServer.redis.client
+        expect(client instanceof Redis).toBe(true)
+        expect(client.options.host).toEqual(redisConfig.host)
+        expect(client.options.port).toEqual(redisConfig.port)
 
-      // SocketIO //
-      expect(signalServer.io instanceof SocketIO)
+        // SocketIO //
+        expect(signalServer.io instanceof SocketIO)
+      })
     })
   })
 
@@ -250,7 +252,7 @@ describe('Signal Server', () => {
           2a-1. Pairing -> Initial Signaling -> Connect [Server → Initiator] -> FAIL
         ===================================================================================
         */
-        describe('<Fail>', () => {
+        describe('<FAIL>', () => {
           it('Should not connect with missing @stage property', async done => {
             let options = _.cloneDeep(connectionOptions)
             delete options.query.stage
@@ -323,7 +325,7 @@ describe('Signal Server', () => {
           2a-1. Pairing -> Initial Signaling -> Connect [Server → Initiator] -> SUCCESS
         ===================================================================================
         */
-        describe('<Success>', () => {
+        describe('<SUCCESS>', () => {
           it('Should initiate socket connection', async done => {
             let options = _.cloneDeep(connectionOptions)
 
@@ -358,7 +360,7 @@ describe('Signal Server', () => {
           2a-2. Pairing -> Initial Signaling -> Handshake [Server → Receiver] -> FAIL
         ===================================================================================
         */
-        describe('<Fail>', () => {
+        describe('<FAIL>', () => {
           it('Should not connect with missing @stage property', async done => {
             let options = _.cloneDeep(connectionOptions)
             delete options.query.stage
@@ -431,7 +433,7 @@ describe('Signal Server', () => {
           2a-2. Pairing -> Initial Signaling -> Handshake [Server → Receiver] -> SUCCESS
         ===================================================================================
         */
-        describe('<Success>', () => {
+        describe('<SUCCESS>', () => {
           it('Should initiate socket connection with credentials supplied by initiator', async done => {
             let options = _.cloneDeep(connectionOptions)
 
@@ -465,7 +467,7 @@ describe('Signal Server', () => {
           2a-3. Pairing -> Initial Signaling -> Signature [Receiver → Server] -> FAIL
         ===================================================================================
         */
-        describe('<Fail>', () => {
+        describe('<FAIL>', () => {
           it('Should not connect with missing @signed property', async done => {
             let payload = _.cloneDeep(signaturePayload)
             delete payload.signed
@@ -538,7 +540,7 @@ describe('Signal Server', () => {
           2a-3. Pairing -> Initial Signaling -> Signature [Receiver → Server] -> SUCCESS
         ===================================================================================
         */
-        describe('<Success>', () => {
+        describe('<SUCCESS>', () => {
           it('Should sign with identity credentials supplied to server for validation against credentials initially supplied to the server by the initiator', async done => {
             let payload = _.cloneDeep(signaturePayload)
             receiver.socket.binary(false).emit(signals.signature, payload)

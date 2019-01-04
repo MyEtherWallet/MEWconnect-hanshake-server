@@ -98,7 +98,6 @@ var SignalServer = function () {
 
     _classCallCheck(this, SignalServer);
 
-    // Instantiate member variable options //
     this.options = options;
 
     // Options will either be set in constructor or default to those defined in @/config //

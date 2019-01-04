@@ -69,7 +69,6 @@ export default class SignalServer {
    * @param {String} options.redis.port - Port that the Redis host runs on
    */
   constructor (options = {}) {
-    // Instantiate member variable options //
     this.options = options
 
     // Options will either be set in constructor or default to those defined in @/config //
