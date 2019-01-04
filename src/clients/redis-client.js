@@ -134,25 +134,40 @@ export default class RedisClient {
     }
   }
 
-  verifySig(connId, sig) {
-    return this.client.hgetall(connId).then(_result => {
-      if (typeof _result === 'object') {
-        if (_result.initialSigned === sig) {
-          return this.client.hset(connId, 'verified', true).then(() => {
-            return Promise.resolve(true)
-          })
-        }
-        return false
-      }
-      return false
-    })
+  async locateMatchingConnection (connId) {
+    let result = await this.client.exists(connId)
+    return result === 1
   }
 
-  locateMatchingConnection(connId) {
-    return this.client.exists(connId).then(_result => {
-      return _result === 1
-    })
+  async getConnectionEntry (connId) {
+    return this.client.hgetall(connId)
   }
+
+  async verifySig (connId, sig) {
+    try {
+      let connectionEntry = this.getConnectionEntry(connId)
+      let isVerified = (connectionEntry.initialSigned === sig)
+      await this.client.hset(connId, 'verified', isVerified)
+      return isVerified
+    } catch (e) {
+      infoLogger.error('verifySig', { e })
+      return false
+    }
+  }
+
+  // verifySig (connId, sig) {
+  //   return this.client.hgetall(connId).then(_result => {
+  //     if (typeof _result === 'object') {
+  //       if (_result.initialSigned === sig) {
+  //         return this.client.hset(connId, 'verified', true).then(() => {
+  //           return Promise.resolve(true)
+  //         })
+  //       }
+  //       return false
+  //     }
+  //     return false
+  //   })
+  // }
 
   updateConnectionEntry(connId, socketId) {
     try {
@@ -190,10 +205,6 @@ export default class RedisClient {
       .then(_result => {
         return _result >= 3
       })
-  }
-
-  getConnectionEntry(connId) {
-    return this.client.hgetall(connId)
   }
 
   // Expose the Underlying Redis Client

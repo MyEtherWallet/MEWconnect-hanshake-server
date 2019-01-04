@@ -281,9 +281,7 @@ var SignalServer = function () {
 
   }, {
     key: 'handleReceiver',
-    value: function handleReceiver(socket, details) {
-      var _this = this;
-
+    value: async function handleReceiver(socket, details) {
       try {
         receiverLog('RECEIVER CONNECTION for ' + details.connId);
 
@@ -296,17 +294,14 @@ var SignalServer = function () {
         }
 
         // Find matching connection pair for a @connId and emit handshake signal //
-        this.redis.locateMatchingConnection(details.connId).then(function (result) {
-          if (result) {
-            verbose(result);
-            _this.redis.getConnectionEntry(details.connId).then(function (_result) {
-              socket.emit(_config.signals.handshake, { toSign: _result.message });
-            });
-          } else {
-            receiverLog('NO INITIATOR CONNECTION FOUND FOR ' + details.connId);
-            socket.emit(_config.signals.invalidConnection);
-          }
-        });
+        var hasMatchingConnection = await this.redis.locateMatchingConnection(details.connId);
+        if (hasMatchingConnection) {
+          var connectionEntry = await this.redis.getConnectionEntry(details.connId);
+          socket.emit(_config.signals.handshake, { toSign: connectionEntry.message });
+        } else {
+          receiverLog('NO INITIATOR CONNECTION FOUND FOR ' + details.connId);
+          socket.emit(_config.signals.invalidConnection);
+        }
       } catch (e) {
         errorLogger.error('receiverIncoming', { e: e });
       }
@@ -443,7 +438,7 @@ var SignalServer = function () {
   }, {
     key: 'receiverConfirm',
     value: function receiverConfirm(socket, details) {
-      var _this2 = this;
+      var _this = this;
 
       try {
         receiverLog('RECEIVER CONFIRM: ', details.connId);
@@ -452,14 +447,14 @@ var SignalServer = function () {
           receiverLog('Located Matching Connection for ' + details.connId);
           verbose(_result);
           if (_result) {
-            _this2.redis.verifySig(details.connId, details.signed).then(function (_result) {
+            _this.redis.verifySig(details.connId, details.signed).then(function (_result) {
               if (_result) {
                 socket.join(details.connId);
                 receiverLog('PAIR CONNECTION VERIFICATION COMPLETED for ' + details.connId);
-                _this2.redis.updateConnectionEntry(details.connId, socket.id).then(function (_result) {
+                _this.redis.updateConnectionEntry(details.connId, socket.id).then(function (_result) {
                   if (_result) {
                     receiverLog('Updated connection entry for ' + details.connId);
-                    _this2.io.to(details.connId).emit(_config.signals.confirmation, {
+                    _this.io.to(details.connId).emit(_config.signals.confirmation, {
                       connId: details.connId,
                       version: details.version
                     });

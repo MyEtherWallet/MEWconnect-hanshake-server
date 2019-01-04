@@ -6,8 +6,6 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
-
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 // Lib //
@@ -154,38 +152,38 @@ var RedisClient = function () {
       }
     }
   }, {
-    key: 'verifySig',
-    value: function verifySig(connId, sig) {
-      var _this2 = this;
-
-      return this.client.hgetall(connId).then(function (_result) {
-        if ((typeof _result === 'undefined' ? 'undefined' : _typeof(_result)) === 'object') {
-          if (_result.initialSigned === sig) {
-            return _this2.client.hset(connId, 'verified', true).then(function () {
-              return Promise.resolve(true);
-            });
-          }
-          return false;
-        }
-        return false;
-      });
+    key: 'locateMatchingConnection',
+    value: async function locateMatchingConnection(connId) {
+      var result = await this.client.exists(connId);
+      return result === 1;
     }
   }, {
-    key: 'locateMatchingConnection',
-    value: function locateMatchingConnection(connId) {
-      return this.client.exists(connId).then(function (_result) {
-        return _result === 1;
-      });
+    key: 'getConnectionEntry',
+    value: async function getConnectionEntry(connId) {
+      return this.client.hgetall(connId);
+    }
+  }, {
+    key: 'verifySig',
+    value: async function verifySig(connId, sig) {
+      try {
+        var connectionEntry = this.getConnectionEntry(connId);
+        var isVerified = connectionEntry.initialSigned === sig;
+        await this.client.hset(connId, 'verified', isVerified);
+        return isVerified;
+      } catch (e) {
+        infoLogger.error('verifySig', { e: e });
+        return false;
+      }
     }
   }, {
     key: 'updateConnectionEntry',
     value: function updateConnectionEntry(connId, socketId) {
-      var _this3 = this;
+      var _this2 = this;
 
       try {
         return this.client.hexists(connId, 'receiver').then(function (_result) {
           if (_result === 0) {
-            return _this3.client.hset(connId, 'receiver', socketId).then(function () {
+            return _this2.client.hset(connId, 'receiver', socketId).then(function () {
               return Promise.resolve(true);
             });
           }
@@ -199,11 +197,11 @@ var RedisClient = function () {
   }, {
     key: 'updateTurnStatus',
     value: function updateTurnStatus(connId) {
-      var _this4 = this;
+      var _this3 = this;
 
       return this.client.hset(connId, 'requireTurn', true).then(function (_response) {
         infoLogger.info(_response);
-        return _this4.client.hincrby(connId, 'tryTurnSignalCount', 1);
+        return _this3.client.hincrby(connId, 'tryTurnSignalCount', 1);
       });
     }
   }, {
@@ -212,11 +210,6 @@ var RedisClient = function () {
       return this.client.hdel(connId, 'initiator', 'receiver', 'initialSigned', 'requireTurn', 'tryTurnSignalCount').then(function (_result) {
         return _result >= 3;
       });
-    }
-  }, {
-    key: 'getConnectionEntry',
-    value: function getConnectionEntry(connId) {
-      return this.client.hgetall(connId);
     }
 
     // Expose the Underlying Redis Client

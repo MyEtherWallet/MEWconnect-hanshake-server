@@ -240,7 +240,7 @@ export default class SignalServer {
    * @param {Object} details - Socket handshake query details provided by the receiver
    * @return {Event} signals.handshake - Event/data payload to be handled by the receiver.
    */
-  handleReceiver (socket, details) {
+  async handleReceiver (socket, details) {
     try {
       receiverLog(`RECEIVER CONNECTION for ${details.connId}`)
 
@@ -253,19 +253,14 @@ export default class SignalServer {
       }
 
       // Find matching connection pair for a @connId and emit handshake signal //
-      this.redis.locateMatchingConnection(details.connId)
-        .then(result => {
-          if (result) {
-            verbose(result)
-            this.redis.getConnectionEntry(details.connId)
-              .then(_result => {
-                socket.emit(signals.handshake, { toSign: _result.message })
-              })
-          } else {
-            receiverLog(`NO INITIATOR CONNECTION FOUND FOR ${details.connId}`)
-            socket.emit(signals.invalidConnection)
-          }
-        })
+      let hasMatchingConnection = await this.redis.locateMatchingConnection(details.connId)
+      if (hasMatchingConnection) {
+        let connectionEntry = await this.redis.getConnectionEntry(details.connId)
+        socket.emit(signals.handshake, { toSign: connectionEntry.message })
+      } else {
+        receiverLog(`NO INITIATOR CONNECTION FOUND FOR ${details.connId}`)
+        socket.emit(signals.invalidConnection)
+      }
     } catch (e) {
       errorLogger.error('receiverIncoming', { e })
     }
