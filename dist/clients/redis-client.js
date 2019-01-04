@@ -1,5 +1,7 @@
 'use strict';
 
+// Import //
+
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
@@ -8,78 +10,133 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
+// Lib //
+
+
 var _ioredis = require('ioredis');
 
 var _ioredis2 = _interopRequireDefault(_ioredis);
-
-var _dotenv = require('dotenv');
-
-var _dotenv2 = _interopRequireDefault(_dotenv);
 
 var _logging = require('logging');
 
 var _logging2 = _interopRequireDefault(_logging);
 
+var _config = require('@config');
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var logger = (0, _logging2.default)('Redis');
+// RedisClient infoLogger //
+var infoLogger = (0, _logging2.default)('Redis');
 
-_dotenv2.default.config();
+/*
+|--------------------------------------------------------------------------
+|
+| RedisClient
+|
+|--------------------------------------------------------------------------
+|
+| Description coming soon...
+|
+*/
 
 var RedisClient = function () {
-  function RedisClient(options) {
-    var _this = this;
+  /**
+   * Represents the Redis Client for handling SocketIO Redis (https://www.npmjs.com/package/ioredis)
+   * functions for the SignalServer and its socket connections.
+   *
+   * @param {Object} options - Configuration options for the Redis Client
+   *                         - These are typically obtained through config files in @/config
+   * @param {String} options.host - Host address of the Redis client
+   * @param {String} options.port - Port that the Redis host runs on
+   * @param {Integer} options.timeout - Timeout in MS for connection
+   * @param {Integer} options.family - IPV4 (4) or IPV6 (6)
+   * @param {Integer} options.db - Redis DB to connect to
+   */
+  function RedisClient() {
+    var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
 
     _classCallCheck(this, RedisClient);
 
-    return async function () {
-      _this.connectionErrorCounter = 0;
-      _this.options = options || {};
-      _this.timeout = _this.options.timeout ? _this.options.timeout : process.env.CONNECTION_TIMEOUT || 60;
-      logger.info('Redis Timeout: ' + _this.timeout + ' seconds');
-      _this.client = await new _ioredis2.default({
-        port: _this.options.port || 6379, // Redis port
-        host: _this.options.host || '127.0.0.1', // Redis host
-        family: _this.options.family || 4, // 4 (IPv4) or 6 (IPv6)
-        db: _this.options.db || 0
-      });
+    // Instantiate member variable options //
+    this.options = options;
 
-      _this.client.on('ready', function () {
-        logger.info('REDIS READY ');
-      });
-      _this.client.on('error', function (err) {
-        if (err.code === 'ECONNREFUSED') {
-          // Terminate process with error if redis server becomes unavailable for too long
-          if (_this.connectionErrorCounter > 100) {
-            logger.error('TERMINATING PROCESS: CONNECTION TO REDIS SERVER REFUSED MORE THAN 100 TIMES');
-            process.exit(1);
-          }
-          _this.connectionErrorCounter++;
-        }
-        logger.error(err);
-      });
-      _this.client.on('connect', function () {
-        logger.info('Client Connected');
-      });
-      _this.client.on('end', function () {
-        logger.info('connection closed');
-      });
-      return _this;
-    }();
+    // Options will either be set in constructor or default to those defined in @/config //
+    this.options.host = this.options.host || _config.redisConfig.host;
+    this.options.port = this.options.port || _config.redisConfig.port;
+    this.options.timeout = this.options.timeout || _config.redisConfig.timeout;
+    this.options.family = this.options.family || _config.redisConfig.family;
+    this.options.db = this.options.db || _config.redisConfig.db;
+
+    // Initialize additional member variables //
+    this.connectionErrorCounter = 0;
   }
 
+  /**
+   * Initialize the Redis Client instance with configured options.
+   * On asynchronous "ready" event, resolve promise.
+   */
+
+
   _createClass(RedisClient, [{
+    key: 'init',
+    value: async function init() {
+      var _this = this;
+
+      return new Promise(function (resolve, reject) {
+        // Create Redis Client with configured options //
+        _this.client = new _ioredis2.default({
+          port: _this.options.port,
+          host: _this.options.host,
+          family: _this.options.family,
+          db: _this.options.db
+        });
+
+        // On ready, resolve promise //
+        _this.client.on('ready', function () {
+          infoLogger.info('REDIS READY ');
+          resolve();
+        });
+
+        // Log client connection //
+        _this.client.on('connect', function () {
+          infoLogger.info('Client Connected');
+        });
+
+        // Log closed connection //
+        _this.client.on('end', function () {
+          infoLogger.info('connection closed');
+        });
+
+        // Terminate process with error if redis server becomes unavailable for too long //
+        _this.client.on('error', function (err) {
+          if (err.code === 'ECONNREFUSED') {
+            if (_this.connectionErrorCounter > 100) {
+              infoLogger.error('TERMINATING PROCESS: CONNECTION TO REDIS SERVER REFUSED MORE THAN 100 TIMES');
+              process.exit(1);
+            }
+            _this.connectionErrorCounter++;
+          }
+          infoLogger.error(err);
+        });
+      });
+    }
+
+    /*
+    ===================================================================================
+      Member Functions
+    ===================================================================================
+    */
+
+  }, {
     key: 'disconnect',
     value: function disconnect() {
       this.client.disconnect();
     }
   }, {
     key: 'createConnectionEntry',
-    value: function createConnectionEntry(details, socketId) {
-      var _this2 = this;
-
+    value: async function createConnectionEntry(details, socketId) {
       var connId = details.connId;
       var message = details.message;
       var initialSigned = details.signed;
@@ -88,23 +145,23 @@ var RedisClient = function () {
       var tryTurnSignalCount = 0;
       var hsetArgs = ['initiator', initiator, 'message', message, 'initialSigned', initialSigned, 'requireTurn', requireTurn, 'tryTurnSignalCount', tryTurnSignalCount];
 
-      return this.client.hset(connId, hsetArgs).then(function (_result) {
-        _this2.client.expire(connId, _this2.timeout).then(function () {
-          return _result;
-        }).catch(function (error) {
-          logger.error('createConnectionEntry', { error: error });
-        });
-      });
+      try {
+        var result = await this.client.hset(connId, hsetArgs);
+        await this.client.expire(connId, this.timeout);
+        return result;
+      } catch (e) {
+        infoLogger.error('createConnectionEntry', { e: e });
+      }
     }
   }, {
     key: 'verifySig',
     value: function verifySig(connId, sig) {
-      var _this3 = this;
+      var _this2 = this;
 
       return this.client.hgetall(connId).then(function (_result) {
         if ((typeof _result === 'undefined' ? 'undefined' : _typeof(_result)) === 'object') {
           if (_result.initialSigned === sig) {
-            return _this3.client.hset(connId, 'verified', true).then(function () {
+            return _this2.client.hset(connId, 'verified', true).then(function () {
               return Promise.resolve(true);
             });
           }
@@ -123,30 +180,30 @@ var RedisClient = function () {
   }, {
     key: 'updateConnectionEntry',
     value: function updateConnectionEntry(connId, socketId) {
-      var _this4 = this;
+      var _this3 = this;
 
       try {
         return this.client.hexists(connId, 'receiver').then(function (_result) {
           if (_result === 0) {
-            return _this4.client.hset(connId, 'receiver', socketId).then(function () {
+            return _this3.client.hset(connId, 'receiver', socketId).then(function () {
               return Promise.resolve(true);
             });
           }
           return false;
         });
       } catch (e) {
-        logger.error('updateConnectionEntry', { e: e });
+        infoLogger.error('updateConnectionEntry', { e: e });
         return false;
       }
     }
   }, {
     key: 'updateTurnStatus',
     value: function updateTurnStatus(connId) {
-      var _this5 = this;
+      var _this4 = this;
 
       return this.client.hset(connId, 'requireTurn', true).then(function (_response) {
-        logger.info(_response);
-        return _this5.client.hincrby(connId, 'tryTurnSignalCount', 1);
+        infoLogger.info(_response);
+        return _this4.client.hincrby(connId, 'tryTurnSignalCount', 1);
       });
     }
   }, {

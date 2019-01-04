@@ -10,7 +10,6 @@ import socketIO from 'socket.io'
 import twilio from 'twilio'
 
 // Lib //
-// import validator from '@helpers/validators'
 import RedisClient from '@clients/redis-client'
 import {
   redisConfig,
@@ -62,12 +61,12 @@ export default class SignalServer {
    *                         - These are typically obtained through config files in @/config
    * @param {Map} options.clients - Map object of connected clients
    * @param {Object} options.server - Configuration pertaining to the HTTP server
-   * @param {Object} options.server.host - Host address of the HTTP server
-   * @param {Object} options.server.port - Port that the HTTP server will run on
+   * @param {String} options.server.host - Host address of the HTTP server
+   * @param {String} options.server.port - Port that the HTTP server will run on
    * @param {Object} options.socket - Configuration pertaining to the socket.io server
    * @param {Object} options.redis - Configuration pertaining to the Redis client
-   * @param {Object} options.redis.host - Host address of the Redis client
-   * @param {Object} options.redis.port - Port that the Redis host runs on
+   * @param {String} options.redis.host - Host address of the Redis client
+   * @param {String} options.redis.port - Port that the Redis host runs on
    */
   constructor (options = {}) {
     // Instantiate member variable options //
@@ -103,7 +102,8 @@ export default class SignalServer {
     this.server = await http.createServer()
 
     // Create Redis client with configuration defined in options or @/config //
-    this.redis = await new RedisClient(this.options.redis)
+    this.redis = new RedisClient()
+    await this.redis.init()
 
     // Promisify server.listen for async/await and listen on configured options //
     let serverPromise = promisify(this.server.listen).bind(this.server)
@@ -210,7 +210,7 @@ export default class SignalServer {
    * @param {Object} details - Socket handshake query details provided by the initiator
    * @return {Event} signals.initiated - Event confirming that channel creation has been successful.
    */
-  handleInitiator (socket, details) {
+  async handleInitiator (socket, details) {
     try {
       initiatorLog(`INITIATOR CONNECTION with connection ID: ${details.connId}`)
 
@@ -223,11 +223,9 @@ export default class SignalServer {
       }
 
       // Create redis entry for socket connection and emit "initiated" event when complete //
-      this.redis.createConnectionEntry(details, socket.id)
-        .then(() => {
-          socket.join(details.connId)
-          socket.emit(signals.initiated, details)
-        })
+      await this.redis.createConnectionEntry(details, socket.id)
+      socket.join(details.connId)
+      socket.emit(signals.initiated, details)
     } catch (e) {
       errorLogger.error('handleInitiator', { e })
     }

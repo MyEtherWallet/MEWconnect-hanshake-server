@@ -9,7 +9,6 @@ Object.defineProperty(exports, "__esModule", {
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 // Lib //
-// import validator from '@helpers/validators'
 
 
 var _debug = require('debug');
@@ -87,12 +86,12 @@ var SignalServer = function () {
    *                         - These are typically obtained through config files in @/config
    * @param {Map} options.clients - Map object of connected clients
    * @param {Object} options.server - Configuration pertaining to the HTTP server
-   * @param {Object} options.server.host - Host address of the HTTP server
-   * @param {Object} options.server.port - Port that the HTTP server will run on
+   * @param {String} options.server.host - Host address of the HTTP server
+   * @param {String} options.server.port - Port that the HTTP server will run on
    * @param {Object} options.socket - Configuration pertaining to the socket.io server
    * @param {Object} options.redis - Configuration pertaining to the Redis client
-   * @param {Object} options.redis.host - Host address of the Redis client
-   * @param {Object} options.redis.port - Port that the Redis host runs on
+   * @param {String} options.redis.host - Host address of the Redis client
+   * @param {String} options.redis.port - Port that the Redis host runs on
    */
   function SignalServer() {
     var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
@@ -136,7 +135,8 @@ var SignalServer = function () {
       this.server = await _http2.default.createServer();
 
       // Create Redis client with configuration defined in options or @/config //
-      this.redis = await new _redisClient2.default(this.options.redis);
+      this.redis = new _redisClient2.default();
+      await this.redis.init();
 
       // Promisify server.listen for async/await and listen on configured options //
       var serverPromise = (0, _util.promisify)(this.server.listen).bind(this.server);
@@ -248,7 +248,7 @@ var SignalServer = function () {
 
   }, {
     key: 'handleInitiator',
-    value: function handleInitiator(socket, details) {
+    value: async function handleInitiator(socket, details) {
       try {
         initiatorLog('INITIATOR CONNECTION with connection ID: ' + details.connId);
 
@@ -261,10 +261,9 @@ var SignalServer = function () {
         }
 
         // Create redis entry for socket connection and emit "initiated" event when complete //
-        this.redis.createConnectionEntry(details, socket.id).then(function () {
-          socket.join(details.connId);
-          socket.emit(_config.signals.initiated, details);
-        });
+        await this.redis.createConnectionEntry(details, socket.id);
+        socket.join(details.connId);
+        socket.emit(_config.signals.initiated, details);
       } catch (e) {
         errorLogger.error('handleInitiator', { e: e });
       }
