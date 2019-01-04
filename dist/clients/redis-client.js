@@ -166,7 +166,7 @@ var RedisClient = function () {
     key: 'verifySig',
     value: async function verifySig(connId, sig) {
       try {
-        var connectionEntry = this.getConnectionEntry(connId);
+        var connectionEntry = await this.getConnectionEntry(connId);
         var isVerified = connectionEntry.initialSigned === sig;
         await this.client.hset(connId, 'verified', isVerified);
         return isVerified;
@@ -177,38 +177,33 @@ var RedisClient = function () {
     }
   }, {
     key: 'updateConnectionEntry',
-    value: function updateConnectionEntry(connId, socketId) {
-      var _this2 = this;
-
+    value: async function updateConnectionEntry(connId, socketId) {
       try {
-        return this.client.hexists(connId, 'receiver').then(function (_result) {
-          if (_result === 0) {
-            return _this2.client.hset(connId, 'receiver', socketId).then(function () {
-              return Promise.resolve(true);
-            });
-          }
-          return false;
-        });
+        var receiverExists = await this.client.hexists(connId, 'receiver');
+        if (!receiverExists) {
+          await this.client.hset(connId, 'receiver', socketId);
+          return true;
+        }
+        return false;
       } catch (e) {
         infoLogger.error('updateConnectionEntry', { e: e });
         return false;
       }
     }
   }, {
+    key: 'removeConnectionEntry',
+    value: async function removeConnectionEntry(connId) {
+      var result = await this.client.hdel(connId, 'initiator', 'receiver', 'initialSigned', 'requireTurn', 'tryTurnSignalCount');
+      return result >= 3;
+    }
+  }, {
     key: 'updateTurnStatus',
     value: function updateTurnStatus(connId) {
-      var _this3 = this;
+      var _this2 = this;
 
       return this.client.hset(connId, 'requireTurn', true).then(function (_response) {
         infoLogger.info(_response);
-        return _this3.client.hincrby(connId, 'tryTurnSignalCount', 1);
-      });
-    }
-  }, {
-    key: 'removeConnectionEntry',
-    value: function removeConnectionEntry(connId) {
-      return this.client.hdel(connId, 'initiator', 'receiver', 'initialSigned', 'requireTurn', 'tryTurnSignalCount').then(function (_result) {
-        return _result >= 3;
+        return _this2.client.hincrby(connId, 'tryTurnSignalCount', 1);
       });
     }
 

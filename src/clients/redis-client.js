@@ -145,7 +145,7 @@ export default class RedisClient {
 
   async verifySig (connId, sig) {
     try {
-      let connectionEntry = this.getConnectionEntry(connId)
+      let connectionEntry = await this.getConnectionEntry(connId)
       let isVerified = (connectionEntry.initialSigned === sig)
       await this.client.hset(connId, 'verified', isVerified)
       return isVerified
@@ -155,45 +155,22 @@ export default class RedisClient {
     }
   }
 
-  // verifySig (connId, sig) {
-  //   return this.client.hgetall(connId).then(_result => {
-  //     if (typeof _result === 'object') {
-  //       if (_result.initialSigned === sig) {
-  //         return this.client.hset(connId, 'verified', true).then(() => {
-  //           return Promise.resolve(true)
-  //         })
-  //       }
-  //       return false
-  //     }
-  //     return false
-  //   })
-  // }
-
-  updateConnectionEntry(connId, socketId) {
+  async updateConnectionEntry (connId, socketId) {
     try {
-      return this.client.hexists(connId, 'receiver').then(_result => {
-        if (_result === 0) {
-          return this.client.hset(connId, 'receiver', socketId).then(() => {
-            return Promise.resolve(true)
-          })
-        }
-        return false
-      })
+      let receiverExists = await this.client.hexists(connId, 'receiver')
+      if (!receiverExists) {
+        await this.client.hset(connId, 'receiver', socketId)
+        return true
+      }
+      return false
     } catch (e) {
       infoLogger.error('updateConnectionEntry', { e })
       return false
     }
   }
 
-  updateTurnStatus(connId) {
-    return this.client.hset(connId, 'requireTurn', true).then(_response => {
-      infoLogger.info(_response)
-      return this.client.hincrby(connId, 'tryTurnSignalCount', 1)
-    })
-  }
-
-  removeConnectionEntry(connId) {
-    return this.client
+  async removeConnectionEntry (connId) {
+    let result = await this.client
       .hdel(
         connId,
         'initiator',
@@ -202,9 +179,14 @@ export default class RedisClient {
         'requireTurn',
         'tryTurnSignalCount'
       )
-      .then(_result => {
-        return _result >= 3
-      })
+    return (result >= 3)
+  }
+
+  updateTurnStatus(connId) {
+    return this.client.hset(connId, 'requireTurn', true).then(_response => {
+      infoLogger.info(_response)
+      return this.client.hincrby(connId, 'tryTurnSignalCount', 1)
+    })
   }
 
   // Expose the Underlying Redis Client

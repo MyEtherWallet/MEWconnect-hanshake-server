@@ -68,7 +68,7 @@ var verbose = (0, _debug2.default)('signal:verbose');
 |
 |--------------------------------------------------------------------------
 |
-| The SignalServer attempts to pair two "signaling" peers together via a secure Socket.io connection.
+| The SignalServer attempts to pair two signaling peers together via a secure Socket.io connection.
 | These peers will then establish a webRTC connection to each other, allowing
 | secure communication using the credentials created during the pairing process.
 |
@@ -79,7 +79,7 @@ var verbose = (0, _debug2.default)('signal:verbose');
 
 var SignalServer = function () {
   /**
-   * Represents the "Signal Server" for handling MEWConnect Requests
+   * Represents the "Signal Server" for handling MEWConnect Pairing Requests
    *
    * @constructor
    * @param {Object} options - Configuration options for the Signal Server
@@ -234,81 +234,6 @@ var SignalServer = function () {
 
     /*
     ===================================================================================
-      Client Initialization Functions
-    ===================================================================================
-    */
-
-    /**
-     * Initialize a socket.io channel/redis entry with details provided by the initiator.
-     *
-     * @param {Object} socket - Client's socket connection object
-     * @param {Object} details - Socket handshake query details provided by the initiator
-     * @return {Event} signals.initiated - Event confirming that channel creation has been successful.
-     */
-
-  }, {
-    key: 'handleInitiator',
-    value: async function handleInitiator(socket, details) {
-      try {
-        initiatorLog('INITIATOR CONNECTION with connection ID: ' + details.connId);
-
-        // Ensure valid socket id and @signed parameter is included //
-        if (!(0, _validation.validHex)(socket.id)) {
-          throw new Error('Connection attempted to pass an invalid socket ID');
-        }
-        if (!details.signed) {
-          throw new Error('Connection attempt missing a valid signed parameter');
-        }
-
-        // Create redis entry for socket connection and emit "initiated" event when complete //
-        await this.redis.createConnectionEntry(details, socket.id);
-        socket.join(details.connId);
-        socket.emit(_config.signals.initiated, details);
-      } catch (e) {
-        errorLogger.error('handleInitiator', { e: e });
-      }
-    }
-
-    /**
-     * Locate matching initiator socket.io channel/redis entry with details provided by the receiver.
-     * This does not connect the receiver to the channel created by the initiator. The receiver
-     * must successfully verify the signature emitted by this function in order to connect.
-     *
-     * @param {Object} socket - Client's socket connection object
-     * @param {Object} details - Socket handshake query details provided by the receiver
-     * @return {Event} signals.handshake - Event/data payload to be handled by the receiver.
-     */
-
-  }, {
-    key: 'handleReceiver',
-    value: async function handleReceiver(socket, details) {
-      try {
-        receiverLog('RECEIVER CONNECTION for ' + details.connId);
-
-        // Ensure valid socket id and @signed parameter is included //
-        if (!(0, _validation.validHex)(socket.id)) {
-          throw new Error('Connection attempted to pass an invalid socket ID');
-        }
-        if (!details.signed) {
-          throw new Error('Connection attempt missing a valid signed parameter');
-        }
-
-        // Find matching connection pair for a @connId and emit handshake signal //
-        var hasMatchingConnection = await this.redis.locateMatchingConnection(details.connId);
-        if (hasMatchingConnection) {
-          var connectionEntry = await this.redis.getConnectionEntry(details.connId);
-          socket.emit(_config.signals.handshake, { toSign: connectionEntry.message });
-        } else {
-          receiverLog('NO INITIATOR CONNECTION FOUND FOR ' + details.connId);
-          socket.emit(_config.signals.invalidConnection);
-        }
-      } catch (e) {
-        errorLogger.error('receiverIncoming', { e: e });
-      }
-    }
-
-    /*
-    ===================================================================================
       Socket Events
     ===================================================================================
     */
@@ -331,7 +256,7 @@ var SignalServer = function () {
     value: function onSignature(socket, data) {
       verbose(_config.signals.signature + ' signal Recieved for ' + data.connId + ' ');
       socket.emit(_config.signals.receivedSignal, _config.signals.signature);
-      this.receiverConfirm(socket, data);
+      this.confirmReceiver(socket, data);
     }
 
     /**
@@ -420,6 +345,142 @@ var SignalServer = function () {
     ===================================================================================
     */
 
+    /**
+     * Initialize a socket.io channel/redis entry with details provided by the initiator.
+     *
+     * @param {Object} socket - Client's socket connection object
+     * @param {Object} details - Socket handshake query details provided by the initiator
+     * @param {String} details.signed - Private key signed with the private key created
+     *                                  for the connection
+     * @param {String} details.connId - Last 32 characters of the public key portion of the key-pair
+     *                                  created for the particular paired connection
+     * @return {Event} signals.initiated - Event confirming that channel creation has been successful.
+     */
+
+  }, {
+    key: 'handleInitiator',
+    value: async function handleInitiator(socket, details) {
+      try {
+        initiatorLog('INITIATOR CONNECTION with connection ID: ' + details.connId);
+
+        // Ensure valid socket id and @signed parameter is included //
+        if (!(0, _validation.validHex)(socket.id)) {
+          throw new Error('Connection attempted to pass an invalid socket ID');
+        }
+        if (!details.signed) {
+          throw new Error('Connection attempt missing a valid signed parameter');
+        }
+
+        // Create redis entry for socket connection and emit "initiated" event when complete //
+        await this.redis.createConnectionEntry(details, socket.id);
+        socket.join(details.connId);
+        socket.emit(_config.signals.initiated, details);
+      } catch (e) {
+        errorLogger.error('handleInitiator', { e: e });
+      }
+    }
+
+    /**
+     * Locate matching initiator socket.io channel/redis entry with details provided by the receiver.
+     * This does not connect the receiver to the channel created by the initiator. The receiver
+     * must successfully verify the signature emitted by this function in order to connect.
+     *
+     * @param {Object} socket - Client's socket connection object
+     * @param {Object} details - Socket handshake query details provided by the receiver
+     * @param {String} details.connId - Last 32 characters of the public key portion of the key-pair
+     *                                  created for the particular paired connection
+     * @return {Event} signals.handshake - Event/data payload to be handled by the receiver.
+     */
+
+  }, {
+    key: 'handleReceiver',
+    value: async function handleReceiver(socket, details) {
+      try {
+        receiverLog('RECEIVER CONNECTION for ' + details.connId);
+
+        // Ensure valid socket id and @signed parameter is included //
+        if (!(0, _validation.validHex)(socket.id)) {
+          throw new Error('Connection attempted to pass an invalid socket ID');
+        }
+        if (!details.signed) {
+          throw new Error('Connection attempt missing a valid signed parameter');
+        }
+
+        // Ensure a matching @connId channel exists //
+        var hasMatchingConnection = await this.redis.locateMatchingConnection(details.connId);
+        if (!hasMatchingConnection) {
+          receiverLog('NO INITIATOR CONNECTION FOUND FOR ' + details.connId);
+          return socket.emit(_config.signals.invalidConnection);
+        }
+
+        // Get matching connection pair for a @connId and emit handshake signal
+        var connectionEntry = await this.redis.getConnectionEntry(details.connId);
+        socket.emit(_config.signals.handshake, { toSign: connectionEntry.message });
+      } catch (e) {
+        errorLogger.error('receiverIncoming', { e: e });
+      }
+    }
+
+    /**
+     * Confirm that the signed "signature" provided by a receiver attempting to connect to
+     * a given @connId matches the signature that the initiator originally provided. If so,
+     * connect the receiver to the @connId channel for communication with the initiator, and update
+     * the redis client entry.
+     *
+     * @param {Object} socket - Client's socket connection object
+     * @param {Object} details - Message payloaded sent by the receiver
+     * @param {String} details.signed - Private key signed with the private key created
+     *                                  for the connection
+     * @param {String} details.connId - Last 32 characters of the public key portion of the key-pair
+     *                                  created for the particular paired connection
+     * @param {Object} details.version - Version-string encrypted object using eccrypto
+     * @return {Event} signals.confirmation - Confirmation of successful connection
+     */
+
+  }, {
+    key: 'confirmReceiver',
+    value: async function confirmReceiver(socket, details) {
+      try {
+        receiverLog('RECEIVER CONFIRM: ', details.connId);
+
+        // Ensure there is a matching redis connection entry //
+        var hasMatchingConnection = await this.redis.locateMatchingConnection(details.connId);
+        if (!hasMatchingConnection) {
+          receiverLog('Invalid connection details for ' + details.connId);
+          return socket.emit(_config.signals.invalidConnection);
+        }
+
+        // Ensure the connection has the proper signature details //
+        var isVerified = await this.redis.verifySig(details.connId, details.signed);
+        if (!isVerified) {
+          receiverLog('Connection verification failed for ' + details.connId);
+          return socket.emit(_config.signals.confirmationFailed);
+        }
+
+        // Connect receiver to @connId channel //
+        socket.join(details.connId);
+
+        // Confirm proper Redis entry update //
+        var didUpdate = await this.redis.updateConnectionEntry(details.connId, socket.id);
+        if (!didUpdate) {
+          receiverLog('Confirmation failed: busy for ' + details.connId);
+          return socket.to(details.connId).emit(_config.signals.confirmationFailedBusy);
+        }
+
+        // Success. Emit confirmation to @connId channel //
+        receiverLog('Updated connection entry for ' + details.connId);
+        this.io.to(details.connId).emit(_config.signals.confirmation, {
+          connId: details.connId,
+          version: details.version
+        });
+        receiverLog('Pair verification completed for ' + details.connId);
+      } catch (e) {
+        errorLogger.error('confirmReceiver', { e: e });
+      }
+    }
+
+    // TODO //
+
   }, {
     key: 'createTurnConnection',
     value: function createTurnConnection() {
@@ -435,63 +496,6 @@ var SignalServer = function () {
         return null;
       }
     }
-  }, {
-    key: 'receiverConfirm',
-    value: function receiverConfirm(socket, details) {
-      var _this = this;
-
-      try {
-        receiverLog('RECEIVER CONFIRM: ', details.connId);
-        if (!(0, _validation.validConnId)(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
-        this.redis.locateMatchingConnection(details.connId).then(function (_result) {
-          receiverLog('Located Matching Connection for ' + details.connId);
-          verbose(_result);
-          if (_result) {
-            _this.redis.verifySig(details.connId, details.signed).then(function (_result) {
-              if (_result) {
-                socket.join(details.connId);
-                receiverLog('PAIR CONNECTION VERIFICATION COMPLETED for ' + details.connId);
-                _this.redis.updateConnectionEntry(details.connId, socket.id).then(function (_result) {
-                  if (_result) {
-                    receiverLog('Updated connection entry for ' + details.connId);
-                    _this.io.to(details.connId).emit(_config.signals.confirmation, {
-                      connId: details.connId,
-                      version: details.version
-                    });
-                  } else {
-                    receiverLog('CONFIRMATION FAILED: BUSY for connection ID ' + details.connId);
-                    socket.to(details.connId).emit(_config.signals.confirmationFailedBusy);
-                  }
-                }).catch(function (error) {
-                  errorLogger.error('receiverConfirm:updateConnectionEntry', { error: error });
-                });
-              } else {
-                receiverLog('CONNECTION VERIFY FAILED for ' + details.connId);
-                socket.emit(_config.signals.confirmationFailed);
-              }
-            }).catch(function (error) {
-              errorLogger.error('receiverConfirm:verifySig', { error: error });
-            });
-          } else {
-            receiverLog('INVALID CONNECTION DETAILS PROVIDED for ' + details.connId);
-            socket.emit(_config.signals.invalidConnection);
-          }
-        }).catch(function (error) {
-          errorLogger.error('receiverConfirm:locateMatchingConnection', {
-            error: error
-          });
-        });
-      } catch (e) {
-        errorLogger.error('receiverConfirm', { e: e });
-      }
-    }
-
-    /*
-    ===================================================================================
-      Validation
-    ===================================================================================
-    */
-
   }]);
 
   return SignalServer;

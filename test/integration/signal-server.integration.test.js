@@ -325,15 +325,8 @@ describe('Signal Server', () => {
         */
         describe('<Success>', () => {
           it('Should initiate socket connection', async done => {
-            let message = CryptoUtils.generateRandomMessage()
-            let options = {
-              query: {
-                stage: stages.initiator,
-                signed: signed,
-                message: message,
-                connId: connId
-              }
-            }
+            let options = _.cloneDeep(connectionOptions)
+
             initiator.socket = await connect(options)
             initiator.socket.on(signals.initiated, async data => {
               done()
