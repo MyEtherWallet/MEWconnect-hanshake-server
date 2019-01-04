@@ -1,3 +1,5 @@
+'use strict'
+
 import Schema from 'validate'
 
 const wholeEncrypted = ['answerSignal', 'offerSignal']

@@ -1,14 +1,14 @@
 'use strict';
 
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.SignalServer = undefined;
+// See: https://www.npmjs.com/package/module-alias //
 
-var _serverClass = require('./serverClass');
+require('module-alias/register');
 
-var _serverClass2 = _interopRequireDefault(_serverClass);
+var _signalServer = require('@/clients/signal-server');
+
+var _signalServer2 = _interopRequireDefault(_signalServer);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-exports.SignalServer = _serverClass2.default;
+var server = new _signalServer2.default();
+server.init();

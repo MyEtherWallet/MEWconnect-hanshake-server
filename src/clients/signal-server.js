@@ -2,7 +2,6 @@
 
 // Import //
 import debug from 'debug'
-import dotenv from 'dotenv'
 import http from 'http'
 import logger from 'logging'
 import { promisify } from 'util'
@@ -21,7 +20,9 @@ import {
   stages
 } from '@config'
 import {
-  validateSignal
+  validateSignal,
+  validConnId,
+  validHex
 } from '@helpers/validation'
 
 // SignalServer Loggers //
@@ -34,7 +35,7 @@ const initiatorLog = debug('signal:initiator')
 const receiverLog = debug('signal:receiver')
 const turnLog = debug('signal:turn')
 const verbose = debug('signal:verbose')
-const extraverbose = debug('verbose')
+// const extraverbose = debug('verbose')
 
 /*
 |--------------------------------------------------------------------------
@@ -55,6 +56,7 @@ const extraverbose = debug('verbose')
 export default class SignalServer {
   /**
    * Represents the "Signal Server" for handling MEWConnect Requests
+   *
    * @constructor
    * @param {Object} options - Configuration options for the Signal Server
    *                         - These are typically obtained through config files in @/config
@@ -126,12 +128,29 @@ export default class SignalServer {
 
   /*
   ===================================================================================
-    "Middlewares"
+    Connection Middleware
   ===================================================================================
   */
 
   /**
+   * Validate that an incoming signal from a client
+   * has the necessary and correctly-formatted parameters
+   *
+   * @param  {Object} message - Client signal/message payload
+   * @param  {Function} next - Socket.IO middleware continue function (required)
+   */
+  async validateSignal (message, next) {
+    try {
+      await validateSignal(message)
+      return next()
+    } catch (e) {
+      return next(new Error('invalid signal or parameters'))
+    }
+  }
+
+  /**
    * Middleware to handle the initial socket on "connection" event from a client.
+   *
    * 1. Validate signal parameters
    * 2. Identify client as a "initiatior" or "receiver" depending
    *    on their handshake.query parameters
@@ -142,25 +161,25 @@ export default class SignalServer {
       // Use class function validate() middleware //
       socket.use(this.validateSignal.bind(this))
 
-      // Get socket handshake query token //
-      const token = socket.handshake.query
-      const stage = token.stage || false
-      const connId = token.connId || false
+      // Socket handshake query //
+      const details = socket.handshake.query
+      const stage = details.stage || false
+      const connId = details.connId || false
 
-      // ERROR: invalid connId//
-      if (this.invalidConnId(connId)) {
+      // Ensure valid connId //
+      if (!validConnId(connId)) {
         throw new Error('Connection attempted to pass an invalid connId')
       }
 
-      // Handle connection based on stage provided by token //
+      // Handle connection based on stage provided by query details //
       switch (stage) {
         case stages.initiator:
           initiatorLog('Initiator stage identifier recieved')
-          this.initiatorIncomming(socket, token)
+          this.handleInitiator(socket, details)
           break
         case stages.receiver:
           receiverLog('Receiver stage identifier recieved')
-          this.receiverIncomming(socket, token)
+          this.handleReceiver(socket, details)
           break
         default:
           errorLogger.error('Invalid Stage Supplied')
@@ -175,6 +194,82 @@ export default class SignalServer {
       socket.on(signals.disconnect, this.onDisconnect.bind(this, socket))
     } catch (e) {
       errorLogger.error('ioConnection', { e })
+    }
+  }
+
+  /*
+  ===================================================================================
+    Client Initialization Functions
+  ===================================================================================
+  */
+
+  /**
+   * Initialize a socket.io channel/redis entry with details provided by the initiator.
+   *
+   * @param {Object} socket - Client's socket connection object
+   * @param {Object} details - Socket handshake query details provided by the initiator
+   * @return {Event} signals.initiated - Event confirming that channel creation has been successful.
+   */
+  handleInitiator (socket, details) {
+    try {
+      initiatorLog(`INITIATOR CONNECTION with connection ID: ${details.connId}`)
+
+      // Ensure valid socket id and @signed parameter is included //
+      if (!validHex(socket.id)) {
+        throw new Error('Connection attempted to pass an invalid socket ID')
+      }
+      if (!details.signed) {
+        throw new Error('Connection attempt missing a valid signed parameter')
+      }
+
+      // Create redis entry for socket connection and emit "initiated" event when complete //
+      this.redis.createConnectionEntry(details, socket.id)
+        .then(() => {
+          socket.join(details.connId)
+          socket.emit(signals.initiated, details)
+        })
+    } catch (e) {
+      errorLogger.error('handleInitiator', { e })
+    }
+  }
+
+  /**
+   * Locate matching initiator socket.io channel/redis entry with details provided by the receiver.
+   * This does not connect the receiver to the channel created by the initiator. The receiver
+   * must successfully verify the signature emitted by this function in order to connect.
+   *
+   * @param {Object} socket - Client's socket connection object
+   * @param {Object} details - Socket handshake query details provided by the receiver
+   * @return {Event} signals.handshake - Event/data payload to be handled by the receiver.
+   */
+  handleReceiver (socket, details) {
+    try {
+      receiverLog(`RECEIVER CONNECTION for ${details.connId}`)
+
+      // Ensure valid socket id and @signed parameter is included //
+      if (!validHex(socket.id)) {
+        throw new Error('Connection attempted to pass an invalid socket ID')
+      }
+      if (!details.signed) {
+        throw new Error('Connection attempt missing a valid signed parameter')
+      }
+
+      // Find matching connection pair for a @connId and emit handshake signal //
+      this.redis.locateMatchingConnection(details.connId)
+        .then(result => {
+          if (result) {
+            verbose(result)
+            this.redis.getConnectionEntry(details.connId)
+              .then(_result => {
+                socket.emit(signals.handshake, { toSign: _result.message })
+              })
+          } else {
+            receiverLog(`NO INITIATOR CONNECTION FOUND FOR ${details.connId}`)
+            socket.emit(signals.invalidConnection)
+          }
+        })
+    } catch (e) {
+      errorLogger.error('receiverIncoming', { e })
     }
   }
 
@@ -277,6 +372,7 @@ export default class SignalServer {
     Member Functions
   ===================================================================================
   */
+
   createTurnConnection () {
     try {
       turnLog('CREATE TURN CONNECTION')
@@ -288,42 +384,6 @@ export default class SignalServer {
     } catch (e) {
       errorLogger.error(e)
       return null
-    }
-  }
-
-  initiatorIncomming (socket, details) {
-    try {
-      initiatorLog(`INITIATOR CONNECTION with connection ID: ${details.connId}`)
-      extraverbose('Initiator details: ', details)
-      if (this.invalidHex(socket.id)) throw new Error('Connection attempted to pass an invalid socket ID')
-      if (!details.signed) throw new Error('Connection attempt missing a valid signed parameter')
-      this.redis.createConnectionEntry(details, socket.id).then(() => {
-        socket.join(details.connId)
-        socket.emit(signals.initiated, details)
-      })
-    } catch (e) {
-      errorLogger.error('initiatorIncomming', { e })
-    }
-  }
-
-  receiverIncomming(socket, details) {
-    try {
-      receiverLog(`RECEIVER CONNECTION for ${details.connId}`)
-      if (!details.signed) throw new Error('Connection attempt missing a valid signed parameter')
-      if (this.invalidConnId(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID')
-      this.redis.locateMatchingConnection(details.connId).then(_result => {
-        if (_result) {
-          verbose(_result)
-          this.redis.getConnectionEntry(details.connId).then(_result => {
-            socket.emit(signals.handshake, { toSign: _result.message })
-          })
-        } else {
-          receiverLog(`NO INITIATOR CONNECTION FOUND FOR ${details.connId}`)
-          socket.emit(signals.invalidConnection)
-        }
-      })
-    } catch (e) {
-      errorLogger.error('receiverIncoming', { e })
     }
   }
 
@@ -406,25 +466,5 @@ export default class SignalServer {
   ===================================================================================
   */
 
-  async validateSignal (message, next) {
-    try {
-      await validateSignal(message)
-      return next()
-    } catch (e) {
-      return next(new Error('invalid signal or parameters'))
-    }
-  }
-
-  invalidConnId (hex) {
-    let validHex = /[0-9A-Fa-f].*/.test(hex)
-    let validLength = (hex.length === 32)
-    let result = !(validHex && validLength)
-    // console.log(result)
-    return result
-  }
-
-  invalidHex (hex) {
-    let validHex = /[0-9A-Fa-f].*/.test(hex)
-    return !validHex
-  }
+  
 }
