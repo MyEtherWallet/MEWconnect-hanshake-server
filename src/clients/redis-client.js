@@ -171,30 +171,9 @@ export default class RedisClient {
    *                    (and possibly modified with updateConnectionEntry())
    */
   async getConnectionEntry (connId) {
-    return this.client.hgetall(connId)
-  }
-
-  /**
-   * Check if a @sig provided matches the initialSigned property originally created
-   * by the initiator with createConnectionEntry() for a particular @connId key.
-   *
-   * @param  {String} connId - Last 32 characters of the public key portion of the key-pair
-   *                           created for the particular paired connection
-   * @param  {String} sig - Signature provided (by the receiver). It should be the private key
-   *                        signed with the private key created for the connection.
-   * @return {[Boolean} - True/false whether or not the initial signature matches that of the
-   *                      signature provided by the receiver.
-   */
-  async verifySig (connId, sig) {
-    try {
-      let connectionEntry = await this.getConnectionEntry(connId)
-      let isVerified = (connectionEntry.initialSigned === sig)
-      await this.client.hset(connId, 'verified', isVerified)
-      return isVerified
-    } catch (e) {
-      infoLogger.error('verifySig', { e })
-      return false
-    }
+    if (!connId) return {}
+    let result = await this.client.hgetall(connId)
+    return result
   }
 
   /**
@@ -207,6 +186,13 @@ export default class RedisClient {
    * @return {Boolean} - True/false if connection entry has been successfully updated or not
    */
   async updateConnectionEntry (connId, socketId) {
+    if (!socketId) return false
+
+    // Can't update an entry that does not exist! //
+    let doesConnectionExist = await this.locateMatchingConnection(connId)
+    if (!doesConnectionExist) return false
+
+    // Update //
     try {
       let receiverExists = await this.client.hexists(connId, 'receiver')
       if (!receiverExists) {
@@ -238,6 +224,29 @@ export default class RedisClient {
         'tryTurnSignalCount'
       )
     return (result >= 3)
+  }
+
+  /**
+   * Check if a @sig provided matches the initialSigned property originally created
+   * by the initiator with createConnectionEntry() for a particular @connId key.
+   *
+   * @param  {String} connId - Last 32 characters of the public key portion of the key-pair
+   *                           created for the particular paired connection
+   * @param  {String} sig - Signature provided (by the receiver). It should be the private key
+   *                        signed with the private key created for the connection.
+   * @return {[Boolean} - True/false whether or not the initial signature matches that of the
+   *                      signature provided by the receiver.
+   */
+  async verifySig (connId, sig) {
+    try {
+      let connectionEntry = await this.getConnectionEntry(connId)
+      let isVerified = (connectionEntry.initialSigned === sig)
+      await this.client.hset(connId, 'verified', isVerified)
+      return isVerified
+    } catch (e) {
+      infoLogger.error('verifySig', { e })
+      return false
+    }
   }
 
   disconnect () {
