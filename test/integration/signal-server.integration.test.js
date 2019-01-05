@@ -601,7 +601,7 @@ describe('Signal Server', () => {
         let encryptedData
         let offerPayload
 
-        beforeAll(async (done) => {
+        beforeAll(async done => {
           encryptedData = await CryptoUtils.encrypt(version, privateKey)
           offerPayload = {
             data: encryptedData,
@@ -762,7 +762,7 @@ describe('Signal Server', () => {
         let encryptedData
         let answerPayload
 
-        beforeAll(async (done) => {
+        beforeAll(async done => {
           encryptedData = await CryptoUtils.encrypt(version, privateKey)
           answerPayload = {
             data: encryptedData,

@@ -18,11 +18,7 @@ import {
   signals,
   stages
 } from '@config'
-import {
-  validateSignal,
-  validConnId,
-  validHex
-} from '@helpers/validation'
+import { validateSignal, validConnId, validHex } from '@helpers/validation'
 
 // SignalServer Loggers //
 const errorLogger = logger('SignalServer:ERROR')
@@ -68,7 +64,7 @@ export default class SignalServer {
    * @param {String} options.redis.host - Host address of the Redis client
    * @param {String} options.redis.port - Port that the Redis host runs on
    */
-  constructor (options = {}) {
+  constructor(options = {}) {
     this.options = options
 
     // Options will either be set in constructor or default to those defined in @/config //
@@ -96,7 +92,7 @@ export default class SignalServer {
    * 4. Connect Redis Adapter
    * 5. Bind SocketIO on-connection middleware
    */
-  async init () {
+  async init() {
     // Create HTTP server //
     this.server = await http.createServer()
 
@@ -107,7 +103,9 @@ export default class SignalServer {
     // Promisify server.listen for async/await and listen on configured options //
     let serverPromise = promisify(this.server.listen).bind(this.server)
     await serverPromise({ host: this.host, port: this.port })
-    infoLogger.info(`Listening on ${this.server.address().address}:${this.port}`)
+    infoLogger.info(
+      `Listening on ${this.server.address().address}:${this.port}`
+    )
 
     // Create socket.io connection using socket.io-redis //
     this.io = await socketIO(this.server, this.options.socket)
@@ -136,7 +134,7 @@ export default class SignalServer {
    * @param  {Object} message - Client signal/message payload
    * @param  {Function} next - Socket.IO middleware continue function (required)
    */
-  async validateSignal (message, next) {
+  async validateSignal(message, next) {
     try {
       await validateSignal(message)
       return next()
@@ -153,7 +151,7 @@ export default class SignalServer {
    *    on their handshake.query parameters
    * 3. Bind events to handle each signal request from a client
    */
-  ioConnection (socket) {
+  ioConnection(socket) {
     try {
       // Use class function validate() middleware //
       socket.use(this.validateSignal.bind(this))
@@ -212,7 +210,7 @@ export default class SignalServer {
    *                               created for the particular paired connection
    * @param {Object} data.version - Version-string encrypted object using eccrypto
    */
-  onSignature (socket, data) {
+  onSignature(socket, data) {
     verbose(`${signals.signature} signal Recieved for ${data.connId} `)
     socket.emit(signals.receivedSignal, signals.signature)
     this.confirmReceiver(socket, data)
@@ -232,12 +230,10 @@ export default class SignalServer {
    *                               TURN server format: [{url: “url”,
    *                               username: “username”, credential: “credential”}, ...]
    */
-  onOfferSignal (socket, data) {
+  onOfferSignal(socket, data) {
     verbose(`${signals.offerSignal} signal Recieved for ${data.connId} `)
     socket.emit(signals.receivedSignal, signals.offerSignal)
-    this.io
-      .to(data.connId)
-      .emit(signals.offer, { data: data.data })
+    this.io.to(data.connId).emit(signals.offer, { data: data.data })
   }
 
   /**
@@ -250,7 +246,7 @@ export default class SignalServer {
    * @param {String} data.connId - Last 32 characters of the public key portion of the key-pair
    *                               created for the particular paired connection
    */
-  onAnswerSignal (socket, data) {
+  onAnswerSignal(socket, data) {
     verbose(`${signals.answerSignal} signal Recieved for ${data.connId} `)
     socket.emit(signals.receivedSignal, signals.answerSignal)
     this.io.to(data.connId).emit(signals.answer, {
@@ -270,7 +266,7 @@ export default class SignalServer {
    *                          Last 32 characters of the public key portion of the key-pair
    *                          created for the particular paired connection
    */
-  onRtcConnected (socket, connId) {
+  onRtcConnected(socket, connId) {
     verbose(`Removing connection entry for: ${connId}`)
     socket.emit(signals.receivedSignal, signals.rtcConnected)
     this.redis.removeConnectionEntry(connId)
@@ -283,7 +279,7 @@ export default class SignalServer {
    * @param {Object} socket - Client's socket connection object
    * @param {String} data - Reason for disconnect
    */
-  onDisconnect (socket, data) {
+  onDisconnect(socket, data) {
     verbose('Disconnect reason: ', data)
     socket.disconnect(true)
   }
@@ -305,7 +301,7 @@ export default class SignalServer {
    *                                  created for the particular paired connection
    * @return {Event} signals.initiated - Event confirming that channel creation has been successful.
    */
-  async handleInitiator (socket, details) {
+  async handleInitiator(socket, details) {
     try {
       initiatorLog(`INITIATOR CONNECTION with connection ID: ${details.connId}`)
 
@@ -337,7 +333,7 @@ export default class SignalServer {
    *                                  created for the particular paired connection
    * @return {Event} signals.handshake - Event/data payload to be handled by the receiver.
    */
-  async handleReceiver (socket, details) {
+  async handleReceiver(socket, details) {
     try {
       receiverLog(`RECEIVER CONNECTION for ${details.connId}`)
 
@@ -350,7 +346,9 @@ export default class SignalServer {
       }
 
       // Ensure a matching @connId channel exists //
-      let hasMatchingConnection = await this.redis.locateMatchingConnection(details.connId)
+      let hasMatchingConnection = await this.redis.locateMatchingConnection(
+        details.connId
+      )
       if (!hasMatchingConnection) {
         receiverLog(`NO INITIATOR CONNECTION FOUND FOR ${details.connId}`)
         return socket.emit(signals.invalidConnection)
@@ -379,19 +377,24 @@ export default class SignalServer {
    * @param {Object} details.version - Version-string encrypted object using eccrypto
    * @return {Event} signals.confirmation - Confirmation of successful connection
    */
-  async confirmReceiver (socket, details) {
+  async confirmReceiver(socket, details) {
     try {
       receiverLog('RECEIVER CONFIRM: ', details.connId)
 
       // Ensure there is a matching redis connection entry //
-      let hasMatchingConnection = await this.redis.locateMatchingConnection(details.connId)
+      let hasMatchingConnection = await this.redis.locateMatchingConnection(
+        details.connId
+      )
       if (!hasMatchingConnection) {
         receiverLog(`Invalid connection details for ${details.connId}`)
         return socket.emit(signals.invalidConnection)
       }
 
       // Ensure the connection has the proper signature details //
-      let isVerified = await this.redis.verifySig(details.connId, details.signed)
+      let isVerified = await this.redis.verifySig(
+        details.connId,
+        details.signed
+      )
       if (!isVerified) {
         receiverLog(`Connection verification failed for ${details.connId}`)
         return socket.emit(signals.confirmationFailed)
@@ -401,22 +404,21 @@ export default class SignalServer {
       socket.join(details.connId)
 
       // Confirm proper Redis entry update //
-      let didUpdate = await this.redis.updateConnectionEntry(details.connId, socket.id)
+      let didUpdate = await this.redis.updateConnectionEntry(
+        details.connId,
+        socket.id
+      )
       if (!didUpdate) {
         receiverLog(`Confirmation failed: busy for ${details.connId}`)
-        return socket
-          .to(details.connId)
-          .emit(signals.confirmationFailedBusy)
+        return socket.to(details.connId).emit(signals.confirmationFailedBusy)
       }
 
       // Success. Emit confirmation to @connId channel //
       receiverLog(`Updated connection entry for ${details.connId}`)
-      this.io
-        .to(details.connId)
-        .emit(signals.confirmation, {
-          connId: details.connId,
-          version: details.version
-        })
+      this.io.to(details.connId).emit(signals.confirmation, {
+        connId: details.connId,
+        version: details.version
+      })
       receiverLog(`Pair verification completed for ${details.connId}`)
     } catch (e) {
       errorLogger.error('confirmReceiver', { e })
@@ -424,7 +426,7 @@ export default class SignalServer {
   }
 
   // TODO //
-  createTurnConnection () {
+  createTurnConnection() {
     try {
       turnLog('CREATE TURN CONNECTION')
       const accountSid = process.env.TWILIO

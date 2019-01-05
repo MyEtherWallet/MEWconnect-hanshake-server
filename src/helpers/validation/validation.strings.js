@@ -1,13 +1,13 @@
 'use strict'
 
-const validConnId = (string) => {
+const validConnId = string => {
   let validHex = /[0-9A-Fa-f].*/.test(string)
-  let validLength = (string.length === 32)
-  let result = (validHex && validLength)
+  let validLength = string.length === 32
+  let result = validHex && validLength
   return result
 }
 
-const validHex = (string) => {
+const validHex = string => {
   let validHex = /[0-9A-Fa-f].*/.test(string)
   return validHex
 }

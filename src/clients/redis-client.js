@@ -34,7 +34,7 @@ export default class RedisClient {
    * @param {Integer} options.family - IPV4 (4) or IPV6 (6)
    * @param {Integer} options.db - Redis DB to connect to
    */
-  constructor (options = {}) {
+  constructor(options = {}) {
     this.options = options
 
     // Options will either be set in constructor or default to those defined in @/config //
@@ -52,7 +52,7 @@ export default class RedisClient {
    * Initialize the Redis Client instance with configured options.
    * On asynchronous "ready" event, resolve promise.
    */
-  async init () {
+  async init() {
     return new Promise((resolve, reject) => {
       // Create Redis Client with configured options //
       this.client = new Redis({
@@ -112,7 +112,7 @@ export default class RedisClient {
    * @param {String} socketId - Socket.io socket.id of the initiator
    * @return {Boolean} - True/false if the entry has been successfully created
    */
-  async createConnectionEntry (details, socketId) {
+  async createConnectionEntry(details, socketId) {
     const connId = details.connId
     const message = details.message
     const initialSigned = details.signed
@@ -141,7 +141,7 @@ export default class RedisClient {
     try {
       let result = await this.client.hset(connId, hsetArgs)
       await this.client.expire(connId, this.options.timeout)
-      return (result >= 5)
+      return result >= 5
     } catch (e) {
       infoLogger.error('createConnectionEntry', { e })
       return false
@@ -156,7 +156,7 @@ export default class RedisClient {
    *                           created for the particular paired connection
    * @return {Boolean} - True if connection found, false if not
    */
-  async locateMatchingConnection (connId) {
+  async locateMatchingConnection(connId) {
     if (!connId) return false
     let result = await this.client.exists(connId)
     return result === 1
@@ -170,7 +170,7 @@ export default class RedisClient {
    * @return {Object} - The connection entry object created with createConnectionEntry()
    *                    (and possibly modified with updateConnectionEntry())
    */
-  async getConnectionEntry (connId) {
+  async getConnectionEntry(connId) {
     if (!connId) return {}
     let result = await this.client.hgetall(connId)
     return result
@@ -185,7 +185,7 @@ export default class RedisClient {
    * @param {String} socketId - Socket.io socket.id of the receiver
    * @return {Boolean} - True/false if connection entry has been successfully updated or not
    */
-  async updateConnectionEntry (connId, socketId) {
+  async updateConnectionEntry(connId, socketId) {
     if (!socketId) return false
 
     // Can't update an entry that does not exist! //
@@ -213,21 +213,20 @@ export default class RedisClient {
    *                           created for the particular paired connection
    * @return {Boolean} - True/false if successfully removed or not
    */
-  async removeConnectionEntry (connId) {
+  async removeConnectionEntry(connId) {
     if (!connId) return false
 
-    let result = await this.client
-      .hdel(
-        connId,
-        'initiator',
-        'receiver',
-        'initialSigned',
-        'requireTurn',
-        'tryTurnSignalCount',
-        'message',
-        'verified'
-      )
-    return (result >= 3)
+    let result = await this.client.hdel(
+      connId,
+      'initiator',
+      'receiver',
+      'initialSigned',
+      'requireTurn',
+      'tryTurnSignalCount',
+      'message',
+      'verified'
+    )
+    return result >= 3
   }
 
   /**
@@ -241,12 +240,12 @@ export default class RedisClient {
    * @return {[Boolean} - True/false whether or not the initial signature matches that of the
    *                      signature provided by the receiver.
    */
-  async verifySig (connId, sig) {
+  async verifySig(connId, sig) {
     if (!connId || !sig) return false
 
     try {
       let connectionEntry = await this.getConnectionEntry(connId)
-      let isVerified = (connectionEntry.initialSigned === sig)
+      let isVerified = connectionEntry.initialSigned === sig
       await this.client.hset(connId, 'verified', isVerified)
       return isVerified
     } catch (e) {
@@ -257,7 +256,7 @@ export default class RedisClient {
 
   // TODO //
 
-  disconnect () {
+  disconnect() {
     this.client.disconnect()
   }
 

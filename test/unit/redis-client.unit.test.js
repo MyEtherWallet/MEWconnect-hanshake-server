@@ -63,10 +63,7 @@ describe('Redis Client', () => {
   describe('Instantiation', () => {
     describe('<SUCCESS>', () => {
       it('Should create a new RedisClient object with the correct properties', () => {
-        const expectedProperties = [
-          'options',
-          'connectionErrorCounter'
-        ]
+        const expectedProperties = ['options', 'connectionErrorCounter']
         expect(Object.keys(redisClient)).toEqual(
           expect.arrayContaining(expectedProperties)
         )
@@ -129,19 +126,28 @@ describe('Redis Client', () => {
         it('Should not be successful with missing @details.connId property', async () => {
           let details = _.cloneDeep(detailsObject)
           delete details.connId
-          let result = await redisClient.createConnectionEntry(details, socketIdInitiator)
+          let result = await redisClient.createConnectionEntry(
+            details,
+            socketIdInitiator
+          )
           expect(result).toBe(false)
         })
         it('Should not be successful with missing @details.message property', async () => {
           let details = _.cloneDeep(detailsObject)
           delete details.message
-          let result = await redisClient.createConnectionEntry(details, socketIdInitiator)
+          let result = await redisClient.createConnectionEntry(
+            details,
+            socketIdInitiator
+          )
           expect(result).toBe(false)
         })
         it('Should not be successful with missing @details.signed property', async () => {
           let details = _.cloneDeep(detailsObject)
           delete details.signed
-          let result = await redisClient.createConnectionEntry(details, socketIdInitiator)
+          let result = await redisClient.createConnectionEntry(
+            details,
+            socketIdInitiator
+          )
           expect(result).toBe(false)
         })
         it('Should not be successful with missing @socketId property', async () => {
@@ -159,7 +165,10 @@ describe('Redis Client', () => {
       describe('<SUCCESS>', () => {
         it('Should successfully create a Redis entry', async () => {
           let details = _.cloneDeep(detailsObject)
-          let result = await redisClient.createConnectionEntry(details, socketIdInitiator)
+          let result = await redisClient.createConnectionEntry(
+            details,
+            socketIdInitiator
+          )
           expect(result).toBe(true)
         })
       })
@@ -253,7 +262,10 @@ describe('Redis Client', () => {
       describe('<FAIL>', () => {
         it('Should not be successful with incorrect @connId property', async () => {
           let invalidConnId = CryptoUtils.generateRandomMessage()
-          let result = await redisClient.updateConnectionEntry(invalidConnId, socketIdReceiver)
+          let result = await redisClient.updateConnectionEntry(
+            invalidConnId,
+            socketIdReceiver
+          )
           expect(result).toBe(false)
         })
         it('Should not be successful with missing @socketId property', async () => {
@@ -269,7 +281,10 @@ describe('Redis Client', () => {
       */
       describe('<SUCCESS>', () => {
         it('Should successfully update the Redis entry', async () => {
-          let result = await redisClient.updateConnectionEntry(connId, socketIdReceiver)
+          let result = await redisClient.updateConnectionEntry(
+            connId,
+            socketIdReceiver
+          )
           expect(result).toBe(true)
 
           let entry = await redisClient.getConnectionEntry(connId)

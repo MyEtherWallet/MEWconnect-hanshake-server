@@ -143,7 +143,7 @@ const tryTurnValidator = new Schema({
   }
 })
 
-const validateSignal = (message) => {
+const validateSignal = message => {
   return new Promise((resolve, reject) => {
     let errors
     if (wholeEncrypted.includes(message[0])) {
