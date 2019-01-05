@@ -214,6 +214,8 @@ export default class RedisClient {
    * @return {Boolean} - True/false if successfully removed or not
    */
   async removeConnectionEntry (connId) {
+    if (!connId) return false
+
     let result = await this.client
       .hdel(
         connId,
@@ -221,7 +223,9 @@ export default class RedisClient {
         'receiver',
         'initialSigned',
         'requireTurn',
-        'tryTurnSignalCount'
+        'tryTurnSignalCount',
+        'message',
+        'verified'
       )
     return (result >= 3)
   }
@@ -238,6 +242,8 @@ export default class RedisClient {
    *                      signature provided by the receiver.
    */
   async verifySig (connId, sig) {
+    if (!connId || !sig) return false
+
     try {
       let connectionEntry = await this.getConnectionEntry(connId)
       let isVerified = (connectionEntry.initialSigned === sig)
@@ -248,6 +254,8 @@ export default class RedisClient {
       return false
     }
   }
+
+  // TODO //
 
   disconnect () {
     this.client.disconnect()

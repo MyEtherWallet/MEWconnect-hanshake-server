@@ -1,7 +1,10 @@
 'use strict'
 
+// Imports //
 import _ from 'lodash'
 import Redis from 'ioredis'
+
+// Libs //
 import RedisClient from '@clients/redis-client'
 import CryptoUtils from '@utils/crypto-utils'
 import { redisConfig } from '@config'
@@ -12,6 +15,7 @@ import { redisConfig } from '@config'
 ===================================================================================
 */
 
+// Instantiate RedisClient instance //
 const redisClient = new RedisClient()
 
 // Key Variables //
@@ -125,27 +129,23 @@ describe('Redis Client', () => {
         it('Should not be successful with missing @details.connId property', async () => {
           let details = _.cloneDeep(detailsObject)
           delete details.connId
-
           let result = await redisClient.createConnectionEntry(details, socketIdInitiator)
           expect(result).toBe(false)
         })
         it('Should not be successful with missing @details.message property', async () => {
           let details = _.cloneDeep(detailsObject)
           delete details.message
-
           let result = await redisClient.createConnectionEntry(details, socketIdInitiator)
           expect(result).toBe(false)
         })
         it('Should not be successful with missing @details.signed property', async () => {
           let details = _.cloneDeep(detailsObject)
           delete details.signed
-
           let result = await redisClient.createConnectionEntry(details, socketIdInitiator)
           expect(result).toBe(false)
         })
         it('Should not be successful with missing @socketId property', async () => {
           let details = _.cloneDeep(detailsObject)
-
           let result = await redisClient.createConnectionEntry(details)
           expect(result).toBe(false)
         })
@@ -159,7 +159,6 @@ describe('Redis Client', () => {
       describe('<SUCCESS>', () => {
         it('Should successfully create a Redis entry', async () => {
           let details = _.cloneDeep(detailsObject)
-
           let result = await redisClient.createConnectionEntry(details, socketIdInitiator)
           expect(result).toBe(true)
         })
@@ -180,7 +179,6 @@ describe('Redis Client', () => {
       describe('<FAIL>', () => {
         it('Should not be successful with missing @connId property', async () => {
           let invalidConnId = CryptoUtils.generateRandomMessage()
-
           let result = await redisClient.locateMatchingConnection(invalidConnId)
           expect(result).toBe(false)
         })
@@ -217,7 +215,6 @@ describe('Redis Client', () => {
       describe('<FAIL>', () => {
         it('Should not be successful with missing @connId property', async () => {
           let invalidConnId = CryptoUtils.generateRandomMessage()
-
           let result = await redisClient.getConnectionEntry(invalidConnId)
           expect(Object.keys(result).length).toBe(0)
         })
@@ -256,7 +253,6 @@ describe('Redis Client', () => {
       describe('<FAIL>', () => {
         it('Should not be successful with incorrect @connId property', async () => {
           let invalidConnId = CryptoUtils.generateRandomMessage()
-
           let result = await redisClient.updateConnectionEntry(invalidConnId, socketIdReceiver)
           expect(result).toBe(false)
         })
@@ -278,6 +274,86 @@ describe('Redis Client', () => {
 
           let entry = await redisClient.getConnectionEntry(connId)
           expect(entry.receiver).toBe(socketIdReceiver)
+        })
+      })
+    })
+
+    /*
+    ===================================================================================
+      3. Methods -> verifySig
+    ===================================================================================
+    */
+    describe('verifySig', () => {
+      /*
+      ===================================================================================
+        3. Methods -> verifySig -> FAIL
+      ===================================================================================
+      */
+      describe('<FAIL>', () => {
+        it('Should not be successful with incorrect @connId property', async () => {
+          let invalidConnId = CryptoUtils.generateRandomMessage()
+          let result = await redisClient.verifySig(invalidConnId, signed)
+          expect(result).toBe(false)
+        })
+        it('Should not be successful with missing @sig property', async () => {
+          let result = await redisClient.verifySig(connId)
+          expect(result).toBe(false)
+        })
+        it('Should not be successful with incorrect @sig property', async () => {
+          let invalidSig = CryptoUtils.generateRandomMessage()
+          let result = await redisClient.verifySig(connId, invalidSig)
+          expect(result).toBe(false)
+        })
+      })
+
+      /*
+      ===================================================================================
+        3. Methods -> verifySig -> SUCCESS
+      ===================================================================================
+      */
+      describe('<SUCCESS>', () => {
+        it('Should successfully verify correct signature', async () => {
+          let result = await redisClient.verifySig(connId, signed)
+          expect(result).toBe(true)
+        })
+      })
+    })
+
+    /*
+    ===================================================================================
+      3. Methods -> removeConnectionEntry
+    ===================================================================================
+    */
+    describe('removeConnectionEntry', () => {
+      /*
+      ===================================================================================
+        3. Methods -> removeConnectionEntry -> FAIL
+      ===================================================================================
+      */
+      describe('<FAIL>', () => {
+        it('Should not be successful with missing @connId property', async () => {
+          let result = await redisClient.removeConnectionEntry()
+          expect(result).toBe(false)
+        })
+        it('Should not be successful with incorrect @connId property', async () => {
+          let invalidConnId = CryptoUtils.generateRandomMessage()
+          let result = await redisClient.removeConnectionEntry(invalidConnId)
+          expect(result).toBe(false)
+        })
+      })
+
+      /*
+      ===================================================================================
+        3. Methods -> removeConnectionEntry -> SUCCESS
+      ===================================================================================
+      */
+      describe('<SUCCESS>', () => {
+        it('Should successfully remove Redis entry', async () => {
+          let result = await redisClient.removeConnectionEntry(connId)
+          expect(result).toBe(true)
+
+          let entry = await redisClient.getConnectionEntry(connId)
+          expect(Object.keys(entry).length).toBe(0)
         })
       })
     })

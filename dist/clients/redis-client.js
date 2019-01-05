@@ -244,7 +244,9 @@ var RedisClient = function () {
   }, {
     key: 'removeConnectionEntry',
     value: async function removeConnectionEntry(connId) {
-      var result = await this.client.hdel(connId, 'initiator', 'receiver', 'initialSigned', 'requireTurn', 'tryTurnSignalCount');
+      if (!connId) return false;
+
+      var result = await this.client.hdel(connId, 'initiator', 'receiver', 'initialSigned', 'requireTurn', 'tryTurnSignalCount', 'message', 'verified');
       return result >= 3;
     }
 
@@ -263,6 +265,8 @@ var RedisClient = function () {
   }, {
     key: 'verifySig',
     value: async function verifySig(connId, sig) {
+      if (!connId || !sig) return false;
+
       try {
         var connectionEntry = await this.getConnectionEntry(connId);
         var isVerified = connectionEntry.initialSigned === sig;
