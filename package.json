@@ -6,8 +6,6 @@
     "build": "rimraf dist/ && babel ./src --out-dir dist/",
     "start": "npm run build && node ./dist/index.js",
     "debug": "npm run build && DEBUG=signal:* node ./dist/index.js",
-    "example": "babel-node ./example/example.js",
-    "asFunctionExample": "babel-node ./example/example2.js",
     "prod": "node dist/index.js",
     "dev": "env NODE_ENV=development nodemon --exec npm start",
     "lint": "prettier --write 'src/**/*.{js,json}' 'test/**/*.{js,json}'",
@@ -18,6 +16,10 @@
     "test:unit": "npm test -- tests/unit",
     "test:integration": "npm test -- tests/integration"
   },
+  "pre-commit": [
+    "lint",
+    "test"
+  ],
   "dependencies": {
     "debug": "~2.6.9",
     "dotenv": "^5.0.1",
@@ -51,6 +53,7 @@
     "ethereumjs-util": "^5.2.0",
     "jest": "^23.6.0",
     "mocha": "^5.2.0",
+    "pre-commit": "^1.2.2",
     "prettier": "^1.15.3",
     "regenerator-runtime": "^0.13.1",
     "secp256k1": "^3.5.2",

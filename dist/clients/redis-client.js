@@ -277,6 +277,9 @@ var RedisClient = function () {
         return false;
       }
     }
+
+    // TODO //
+
   }, {
     key: 'disconnect',
     value: function disconnect() {
