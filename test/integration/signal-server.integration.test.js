@@ -33,7 +33,7 @@ import RedisClient from '@clients/redis-client'
 | "Pairing" section:
 |
 | 1. Initialization
-  2. Pairing
+| 2. Pairing
 |     a. Initial Signaling
 |     b. Offer Creation
 |     c. Answer Creation

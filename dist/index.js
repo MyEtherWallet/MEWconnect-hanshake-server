@@ -10,7 +10,5 @@ var _signalServer2 = _interopRequireDefault(_signalServer);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-console.log(process.env.TESTLALA);
-
 var server = new _signalServer2.default();
 server.init();
