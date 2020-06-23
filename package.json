@@ -9,8 +9,11 @@
     "example": "babel-node ./example/example.js",
     "asFunctionExample": "babel-node ./example/example2.js",
     "prod": "node dist/run.js",
+    "start:docker": "npm run build && pm2-runtime  dist/run.js",
+    "prod:docker": "pm2-runtime  dist/run.js",
     "dev": "env NODE_ENV=development nodemon --exec npm start",
-    "test": "env NODE_ENV=development mocha --exit --require babel-core/register test/*"
+    "test": "env NODE_ENV=development mocha --exit --require babel-core/register test/*",
+    "build:docker": "docker build --force-rm  --no-cache --tag=handshake-server ."
   },
   "dependencies": {
     "debug": "~2.6.9",

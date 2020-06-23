@@ -1,0 +1,27 @@
+version: '3'
+
+services:
+  redis:
+    container_name: redis
+    image: redis:4.0-alpine
+    ports:
+      - "6379:6379"
+    expose:
+      - 6379
+    restart:
+      always
+  api:
+    container_name: api
+    image: handshake-server
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    ports:
+      - "8080:8080"
+    environment:
+      - DATA_REDIS_HOST=redis
+#      - DEBUG=*
+    links:
+      - redis
+    command: npm run start:docker
