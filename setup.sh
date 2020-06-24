@@ -16,18 +16,19 @@ has_param() {
 }
 
 # Setup options:
-GIT_URL=https://github.com/MyEtherWallet/MEWconnect-hanshake-server.git
 DOCKER_COMPOSE_VERSION=1.24.0
+DOCKER_IMAGE_TAG=handshake-server
 ENV_FILE='.env'
 CURRENCY_FILE='currencyConfig.js'
-DIR_NAME="$(echo ${GIT_URL} | sed 's=.*/==;s/\.[^.]*$/1/')"
+
 
 
 # GIT options
+GIT_URL=https://github.com/MyEtherWallet/MEWconnect-hanshake-server.git
 # Use a branch other than master
 FROM_BRANCH=true
 # The name of the branch to use
-BRANCH_NAME=dockertize;
+BRANCH_NAME=dockertized;
 
 # defaults
 RESTART_VAR='false'
@@ -40,6 +41,8 @@ REBUILD_RESTART='false'
 RUN_ALL='false'
 NO_CACHE='false'
 
+
+DIR_NAME="$(echo ${GIT_URL} | sed 's=.*/==;s/\.[^.]*$//')"
 POSITIONAL=()
 while [[ $# -gt 0 ]]
 do
@@ -260,29 +263,24 @@ fi
 stopDocker(){
   echo "Stopping Docker Containers"
   #  sudo docker stop $(sudo docker ps -a -q)
-  sudo docker stop "frontend"
+  sudo docker stop "redis"
   sudo docker stop "api"
-  sudo docker stop "nginx"
-  sudo docker stop "mongo_db"
 }
 
 startDocker(){
   echo "Starting Docker Containers"
   #  sudo docker stop $(sudo docker ps -a -q)
-  sudo docker start "frontend"
+  sudo docker start "redis"
   sudo docker start "api"
-  sudo docker start "nginx"
-  sudo docker start "mongo_db"
 }
 
 purgeDocker(){
   stopDocker
   echo "Removing Docker Containers"
   #  sudo docker rm $(sudo docker ps -a -q)
-  sudo docker rm "frontend"
+  sudo docker rm "redis"
   sudo docker rm "api"
-  sudo docker rm "nginx"
-  sudo docker rm "mongo_db"
+
 }
 
 cleanAllImages(){
@@ -293,20 +291,24 @@ cleanAllImages(){
 
 buildDockerImages(){
     echo $PWD
+    cd ./${DIR_NAME};
+    echo "entering $PWD";
+
     cp ../${ENV_FILE} ./
-    cd src;
+#    cd src;
+#    echo "entering $PWD";
     cp ../${ENV_FILE} ./
     if [ $NO_CACHE = "true" ]; then
       cleanAllImages
     fi
 
     if [ $NO_CACHE = "true" ]; then
-      sudo docker build --force-rm --no-cache --tag=simplex-api .
+      sudo docker build --force-rm --no-cache --tag=${DOCKER_IMAGE_TAG} .
     else
-      sudo docker build --force-rm --tag=simplex-api .
+      sudo docker build --force-rm --tag=${DOCKER_IMAGE_TAG} .
     fi
 
-    cd ../
+#    cd ../
 }
 
 createDataDirectory(){
@@ -319,15 +321,17 @@ createDataDirectory(){
 }
 
 doSetup(){
-  if [ -f ${ENV_FILE} ]; then
+  if [[ -f ${ENV_FILE} ]]; then
     echo "env file exists"
 #    createDataDirectory
-    if [ -d "simplex-api" ]; then
+    if [[ -d ${DIR_NAME} ]]; then
       purgeDocker
       echo "prior ${DIR_NAME} dir exists"
-      sudo rm -rf ./simplex-api/
+      echo "removing prior ${DIR_NAME} dir"
+      sudo rm -rf "./${DIR_NAME}/"
       checkoutRepo
       buildDockerImages
+      echo $(ls)
       sudo docker-compose up -d --remove-orphans
       sudo docker ps
     else
@@ -341,16 +345,15 @@ doSetup(){
       echo "ERROR: failed to begin setup. .env file does not exist"
   fi
 }
-#
-#alternateActionsAndAbort
-#
+
+alternateActionsAndAbort
+
 installDocker
 installDockerCompose
 #
 #runFromRepoDeploy
 #
 doSetup
-
 
 
 

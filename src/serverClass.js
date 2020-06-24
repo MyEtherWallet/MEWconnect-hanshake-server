@@ -54,13 +54,14 @@ export default class SignalServer {
   }
 
   validate(message, next) {
-    validator(message)
-      .then(result => {
-        if (result) {
-          return next();
-        }
-        return next(new Error('invalid signal or paramaters'));
-      });
+    return next();
+    // validator(message)
+    //   .then(result => {
+    //     if (result) {
+    //       return next();
+    //     }
+    //     return next(new Error('invalid signal or paramaters'));
+    //   });
   }
 
   createTurnConnection() {

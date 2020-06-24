@@ -18,10 +18,10 @@ services:
     depends_on:
       - redis
     ports:
-      - "8080:8080"
+      - "8080:8080/tcp"
     environment:
       - DATA_REDIS_HOST=redis
-#      - DEBUG=*
+      - DEBUG=signal:*
     links:
       - redis
     command: npm run start:docker
