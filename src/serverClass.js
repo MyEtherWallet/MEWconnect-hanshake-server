@@ -31,7 +31,7 @@ export default class SignalServer {
     this.port = options.server.port || server.port;
     this.host = options.server.host || server.host;
     this.server = http.createServer();
-
+    console.log(process.env.TWILIO); // todo remove dev item
     const redisOptions = options.redis.port ? options.redis : redis;
     this.redis = new RedisClient(redisOptions);
 
