@@ -21,6 +21,9 @@ services:
       - "8080:8080/tcp"
     environment:
       - DATA_REDIS_HOST=redis
+      - TWILIO=TWILIO
+      - TWILIO_TTL=TWILIO_TTL
+      - TWILLO_TOKEN=TWILLO_TOKEN
       - DEBUG=signal:*
     links:
       - redis
