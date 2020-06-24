@@ -30,7 +30,6 @@ export default class SignalServer {
     this.clients = options.clients || new Map();
     this.port = options.server.port || server.port;
     this.host = options.server.host || server.host;
-
     this.server = http.createServer();
 
     const redisOptions = options.redis.port ? options.redis : redis;
