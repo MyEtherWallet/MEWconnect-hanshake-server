@@ -23,7 +23,7 @@ services:
       - DATA_REDIS_HOST=redis
       - TWILIO=${TWILIO}
       - TWILIO_TTL=${TWILIO_TTL}
-      - TWILLO_TOKEN=${TWILLO_TOKEN}
+      - TWILIO_TOKEN=${TWILIO_TOKEN}
       - DEBUG=signal:*
     links:
       - redis
