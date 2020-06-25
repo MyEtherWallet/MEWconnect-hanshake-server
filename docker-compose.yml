@@ -10,6 +10,20 @@ services:
       - 6379
     restart:
       always
+  nginx:
+    container_name: nginx
+    image: nginx:latest
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - "../certs/connect.mewapi.key:/etc/connect.mewapi.key"
+      - "../certs/connect.mewapi.cert:/etc/connect.mewapi.cert"
+    environment:
+      - NGINX_HOST=example.com
+      - NGINX_PORT=80
+    ports:
+      - "440:443/tcp"
+    links:
+      - api
   api:
     container_name: api
     image: handshake-server
