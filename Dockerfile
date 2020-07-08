@@ -18,7 +18,7 @@ WORKDIR /
 COPY . /
 RUN npm install
 RUN npm run build
-EXPOSE 8080/tcp
+EXPOSE 3000/tcp
 
 #FROM redis
 #COPY redis.conf /usr/local/etc/redis/redis.conf
