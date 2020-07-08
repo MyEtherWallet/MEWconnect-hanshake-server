@@ -45,4 +45,6 @@ services:
       - DEBUG=signal:*
     links:
       - redis
+    sysctls:
+      - net.core.somaxconn=1024
     command: npm run start:docker
