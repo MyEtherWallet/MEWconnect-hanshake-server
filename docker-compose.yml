@@ -42,7 +42,7 @@ services:
       - TWILIO=${TWILIO}
       - TWILIO_TTL=${TWILIO_TTL}
       - TWILIO_TOKEN=${TWILIO_TOKEN}
-      - DEBUG=signal:*
+#      - DEBUG=signal:*
     links:
       - redis
     sysctls:
