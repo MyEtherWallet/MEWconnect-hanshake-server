@@ -10,6 +10,8 @@ services:
       - 6379
     restart:
       always
+    sysctls:
+      - net.core.somaxconn=1024
   nginx:
     container_name: nginx
     image: nginx:latest
