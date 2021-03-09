@@ -15,6 +15,7 @@ services:
       always
     sysctls:
       - net.core.somaxconn=1024
+    command: redis-server /usr/local/etc/redis/redis.conf
   nginx:
     container_name: nginx
     image: nginx:latest
