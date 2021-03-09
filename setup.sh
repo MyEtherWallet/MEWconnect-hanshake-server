@@ -40,7 +40,8 @@ PURGE_IMAGES='false'
 REBUILD_RESTART='false'
 RUN_ALL='false'
 NO_CACHE='false'
-
+NO_GIT='false'
+VIEW_LOGS='false'
 
 DIR_NAME="$(echo ${GIT_URL} | sed 's=.*/==;s/\.[^.]*$//')"
 POSITIONAL=()
@@ -85,6 +86,16 @@ case $key in
     ;;
     -a|--all)
     RUN_ALL='true'
+    FLAGGED='true'
+    shift # past argument
+    ;;
+    -ng|--no-git)
+    NO_GIT='true'
+    FLAGGED='true'
+    shift # past argument
+    ;;
+    -vl|--view-logs)
+    VIEW_LOGS='true'
     FLAGGED='true'
     shift # past argument
     ;;
@@ -137,7 +148,7 @@ runFromRepoDeploy(){
   prg=$dir/$(basename -- "$prg") || exit
 
 echo $prg
-  if [[ $prg == *"/simplex-api/deploy/"* ]]; then
+  if [[ $prg == *"/${DIR_NAME}/deploy/"* ]]; then
     echo "running from deploy directory"
     cd ../
   fi
@@ -155,17 +166,27 @@ if [ "$RESTART_VAR" = 'true' ]; then
     echo ${RESTART_VAR}
     stopDocker
     if [ -d "simplex-api"  ]; then
-    cd simplex-api
+    cd ${DIR_NAME}
     fi
-    sudo docker-compose up -d --remove-orphans
+    if [ "$VIEW_LOGS" == 'true' ]; then
+      sudo docker-compose up --remove-orphans
+    else
+      sudo docker-compose up -d --remove-orphans
+    fi
 fi
+
 
 if [ "$REBUILD_RESTART" = 'true' ]; then
     echo "Removing docker containers, rebuilding and running docker-compose"
     purgeDocker
-    cd simplex-api;
+    cd ${DIR_NAME};
     buildDockerImages
-    sudo docker-compose up -d --remove-orphans
+    if [ "$VIEW_LOGS" == 'true' ]; then
+      sudo docker-compose up --remove-orphans
+    else
+      sudo docker-compose up -d --remove-orphans
+    fi
+
 fi
 
 if [ "$STOP_DOCKER" == 'true' ]; then
@@ -265,6 +286,9 @@ stopDocker(){
   #  sudo docker stop $(sudo docker ps -a -q)
   sudo docker stop "redis"
   sudo docker stop "api"
+  sudo docker stop "nginx"
+
+
 }
 
 startDocker(){
@@ -272,6 +296,7 @@ startDocker(){
   #  sudo docker stop $(sudo docker ps -a -q)
   sudo docker start "redis"
   sudo docker start "api"
+  sudo docker stop "nginx"
 }
 
 purgeDocker(){
@@ -280,6 +305,7 @@ purgeDocker(){
   #  sudo docker rm $(sudo docker ps -a -q)
   sudo docker rm "redis"
   sudo docker rm "api"
+  sudo docker stop "nginx"
 
 }
 
@@ -295,7 +321,8 @@ buildDockerImages(){
     echo "entering $PWD";
 
     cp ../${ENV_FILE} ./
-#    cd src;
+    cd src;
+    cd ../
 #    echo "entering $PWD";
     cp ../${ENV_FILE} ./
     if [ $NO_CACHE = "true" ]; then
@@ -323,13 +350,20 @@ createDataDirectory(){
 doSetup(){
   if [[ -f ${ENV_FILE} ]]; then
     echo "env file exists"
-#    createDataDirectory
+   createDataDirectory
     if [[ -d ${DIR_NAME} ]]; then
       purgeDocker
       echo "prior ${DIR_NAME} dir exists"
       echo "removing prior ${DIR_NAME} dir"
       sudo rm -rf "./${DIR_NAME}/"
       checkoutRepo
+      cd ./${DIR_NAME};
+      echo "entering $PWD";
+      cp ../${ENV_FILE} ./
+      cd ./src;
+      echo "entering $PWD";
+      cp ../${ENV_FILE} ./
+      cd ../../
       buildDockerImages
       echo $(ls)
       sudo docker-compose up -d --remove-orphans

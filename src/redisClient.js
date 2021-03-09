@@ -7,7 +7,7 @@ const logger = createLogger('Redis');
 dotenv.config();
 
 export default class RedisClient {
-  constructor(options) {
+  constructor (options) {
     this.connectionErrorCounter = 0;
     this.options = options || {};
     this.timeout = this.options.timeout ? this.options.timeout : process.env.CONNECTION_TIMEOUT || 60;
@@ -41,11 +41,11 @@ export default class RedisClient {
     });
   }
 
-  disconnect() {
+  disconnect () {
     this.client.disconnect();
   }
 
-  createConnectionEntry(details, socketId) {
+  createConnectionEntry (details, socketId) {
     const connId = details.connId;
     const message = details.message;
     const initialSigned = details.signed;
@@ -76,7 +76,7 @@ export default class RedisClient {
       });
   }
 
-  verifySig(connId, sig) {
+  verifySig (connId, sig) {
     return this.client.hgetall(connId)
       .then((_result) => {
         if (typeof _result === 'object') {
@@ -90,14 +90,14 @@ export default class RedisClient {
       });
   }
 
-  locateMatchingConnection(connId) {
+  locateMatchingConnection (connId) {
     return this.client.exists(connId)
       .then((_result) => {
         return _result === 1;
       });
   }
 
-  updateConnectionEntry(connId, socketId) {
+  updateConnectionEntry (connId, socketId) {
     try {
       return this.client.hexists(connId, 'receiver')
         .then((_result) => {
@@ -117,7 +117,7 @@ export default class RedisClient {
     }
   }
 
-  updateTurnStatus(connId) {
+  updateTurnStatus (connId) {
     return this.client.hset(
       connId,
       'requireTurn',
@@ -133,7 +133,7 @@ export default class RedisClient {
       });
   }
 
-  removeConnectionEntry(connId) {
+  removeConnectionEntry (connId) {
     return this.client.hdel(
       connId,
       'initiator',
@@ -147,16 +147,16 @@ export default class RedisClient {
       });
   }
 
-  getConnectionEntry(connId) {
+  getConnectionEntry (connId) {
     return this.client.hgetall(connId);
   }
 
   // Expose the Underlying Redis Client
-  getClient() {
+  getClient () {
     return this.client;
   }
 
-  hset(identifier, requestedBlockNumber, clonedValue) {
+  hset (identifier, requestedBlockNumber, clonedValue) {
     return this.client.hset(
       identifier,
       'blockNumber',
@@ -166,7 +166,7 @@ export default class RedisClient {
     );
   }
 
-  hsetExpires(identifier, requestedBlockNumber, clonedValue, time) {
+  hsetExpires (identifier, requestedBlockNumber, clonedValue, time) {
     return this.client.hset(
       requestedBlockNumber,
       identifier,
@@ -176,11 +176,19 @@ export default class RedisClient {
     );
   }
 
-  hgetall(identifier) {
+  hgetall (identifier) {
     return this.client.hgetall(identifier);
   }
 
-  hdel(previousHex, key) {
+  hdel (previousHex, key) {
     return this.client.hdel(previousHex, key);
+  }
+
+  flushdb () {
+    return new Promise((resolve, reject) => {
+      this.client.flushdb().then(res => {
+        resolve()
+      })
+    });
   }
 }

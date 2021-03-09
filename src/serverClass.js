@@ -47,6 +47,10 @@ export default class SignalServer {
     });
 
     this.io.on(signal.connection, this.ioConnection.bind(this));
+
+    setInterval(() => {
+      this.redis.flushdb()
+    }, 86400000)
   }
 
   static create (options) {
