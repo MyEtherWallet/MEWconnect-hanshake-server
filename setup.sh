@@ -347,6 +347,19 @@ createDataDirectory(){
   fi
 }
 
+copyNginxConfig(){
+  if [ -f "nginx.conf" ]; then
+      if [ -d "MEWconnect-hanshake-server" ]; then
+        cp nginx.conf ./MEWconnect-hanshake-server/nginx
+        echo "copied nginx.conf to MEWconnect-hanshake-server/nginx"
+      else
+        echo "no MEWconnect-hanshake-server directory present"
+      fi
+  else
+    echo "no nginx.conf file present"
+  fi
+}
+
 doSetup(){
   if [[ -f ${ENV_FILE} ]]; then
     echo "env file exists"
@@ -357,6 +370,7 @@ doSetup(){
       echo "removing prior ${DIR_NAME} dir"
       sudo rm -rf "./${DIR_NAME}/"
       checkoutRepo
+      copyNginxConfig
       cd ./${DIR_NAME};
       echo "entering $PWD";
       cp ../${ENV_FILE} ./
