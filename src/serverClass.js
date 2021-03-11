@@ -47,10 +47,14 @@ export default class SignalServer {
     });
 
     this.io.on(signal.connection, this.ioConnection.bind(this));
+    this.lastMessage = new Date().getTime();
 
     setInterval(() => {
-      this.redis.flushdb()
-    }, 86400000)
+      if (this.lastMessage + 10 * 60 * 60 * 24 * 1000 < new Date().getTime()) {
+        this.redis.flushdb()
+        this.lastMessage = new Date().getTime();
+      } // wait extra 10 minutes)
+    }, 10000)
   }
 
   static create (options) {
