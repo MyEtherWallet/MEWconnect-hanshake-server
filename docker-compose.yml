@@ -6,7 +6,7 @@ services:
     image: redis:4.0-alpine
     volumes:
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
-      - ./dbdata:/dbdata/
+      - /home/ubuntu/dbdata:/dbdata/
 #    ports:
 #      - "6379:6379"
     expose:
