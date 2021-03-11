@@ -339,7 +339,7 @@ buildDockerImages(){
 }
 
 createDataDirectory(){
-  if [ -d "dbdata" ]; then
+  if [[ -d "dbdata" ]]; then
     echo "data directory exists"
   else
     echo "making data directory"
@@ -348,14 +348,18 @@ createDataDirectory(){
 }
 
 copyNginxConfig(){
-  if [ -f "nginx.conf" ]; then
-      if [ -d "MEWconnect-hanshake-server" ]; then
+  echo $PWD
+  cd ../
+  if [[ -f "nginx.conf" ]]; then
+      if [[ -d "MEWconnect-hanshake-server" ]]; then
         cp nginx.conf ./MEWconnect-hanshake-server/nginx
         echo "copied nginx.conf to MEWconnect-hanshake-server/nginx"
+        cd ./${DIR_NAME};
       else
         echo "no MEWconnect-hanshake-server directory present"
       fi
   else
+    cd ./${DIR_NAME};
     echo "no nginx.conf file present"
   fi
 }
