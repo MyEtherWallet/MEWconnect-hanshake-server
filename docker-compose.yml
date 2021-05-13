@@ -15,6 +15,11 @@ services:
       always
     sysctls:
       - net.core.somaxconn=1024
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100M"
+        max-file: "3"
     command: redis-server /usr/local/etc/redis/redis.conf
   nginx:
     container_name: nginx
@@ -29,6 +34,11 @@ services:
       - 3000
     links:
       - api
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100M"
+        max-file: "3"
   api:
     build:
       context: .
@@ -51,4 +61,9 @@ services:
       - redis
     sysctls:
       - net.core.somaxconn=1024
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100M"
+        max-file: "3"
     command: npm run start:docker

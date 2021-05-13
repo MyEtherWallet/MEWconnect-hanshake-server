@@ -51,6 +51,7 @@ export default class SignalServer {
 
     setInterval(() => {
       if (this.lastMessage + 10 * 60 * 60 * 24 * 1000 < new Date().getTime()) {
+        console.log('FLUSHING DATABASE'); // todo remove dev item
         this.redis.flushdb()
         this.lastMessage = new Date().getTime();
       } // wait extra 10 minutes)
@@ -182,7 +183,7 @@ export default class SignalServer {
 
   ioConnection (socket) {
     try {
-      socket.use(this.validate.bind(this));
+      // socket.use(this.validate.bind(this));
       const token = socket.handshake.query;
       const connector = token.stage || false;
       if (this.invalidHex(token.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
