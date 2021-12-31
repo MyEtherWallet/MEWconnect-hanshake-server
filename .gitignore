@@ -1,3 +1,9 @@
 # Created by .ignore support plugin (hsz.mobi)
 .idea/
 node_modules/
+.env
+.yarn/
+dbdata/
+dist/validators.js
+/.env
+/src/.env

@@ -13,6 +13,7 @@ run.config:
   extra_steps:
     - npm install
     - npm run build
+    - npm install pm2 -g
 
 data.redis :
   image : nanobox/redis:4.0

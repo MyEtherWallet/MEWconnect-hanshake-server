@@ -7,7 +7,7 @@ import http from 'http';
 import socketIO from 'socket.io';
 import redisAdapter from 'socket.io-redis';
 
-import validator from './validators';
+// import validator from './validators';
 import RedisClient from './redisClient';
 import { redis, server, socket, signal, stages } from './config';
 
@@ -24,46 +24,57 @@ const verbose = debug('signal:verbose');
 const extraverbose = debug('verbose');
 
 export default class SignalServer {
-  constructor(options = {}) {
+  constructor (options = {}) {
     options.server = options.server || {};
     options.redis = options.redis || {};
     this.clients = options.clients || new Map();
-    this.port = options.server.port || server.port;
+    this.port = 3000; // options.server.port || server.port;
     this.host = options.server.host || server.host;
-
     this.server = http.createServer();
-
     const redisOptions = options.redis.port ? options.redis : redis;
     this.redis = new RedisClient(redisOptions);
 
     this.io = socketIO(this.server, options.socket || socket);
-    if (options.redis) this.io.adapter(redisAdapter({
-      host: options.redis.host || redis.host,
-      port: options.redis.port || redis.port
-    }));
+
+    if (options.redis) {
+      this.io.adapter(redisAdapter({
+        host: options.redis.host || redis.host,
+        port: options.redis.port || redis.port
+      }));
+    }
     this.server.listen({host: this.host, port: this.port}, () => {
       infoLogger.info(`Listening on ${this.server.address().address}:${this.port}`);
     });
 
     this.io.on(signal.connection, this.ioConnection.bind(this));
+    this.lastMessage = new Date().getTime();
+
+    setInterval(() => {
+      if (this.lastMessage + 10 * 60 * 60 * 24 * 1000 < new Date().getTime()) {
+        console.log('FLUSHING DATABASE'); // todo remove dev item
+        this.redis.flushdb()
+        this.lastMessage = new Date().getTime();
+      } // wait extra 10 minutes)
+    }, 10000)
   }
 
-  static create(options) {
+  static create (options) {
     // if no options object is provided then the options set in the config are used
     return new SignalServer(options);
   }
 
-  validate(message, next) {
-    validator(message)
-      .then(result => {
-        if (result) {
-          return next();
-        }
-        return next(new Error('invalid signal or paramaters'));
-      });
+  validate (message, next) {
+    return next();
+    // validator(message)
+    //   .then(result => {
+    //     if (result) {
+    //       return next();
+    //     }
+    //     return next(new Error('invalid signal or paramaters'));
+    //   });
   }
 
-  createTurnConnection() {
+  createTurnConnection () {
     try {
       turnLog('CREATE TURN CONNECTION');
       const accountSid = process.env.TWILIO;
@@ -78,11 +89,11 @@ export default class SignalServer {
     }
   }
 
-  invalidHex(hex) {
+  invalidHex (hex) {
     return !(/[0-9A-Fa-f].*/.test(hex));
   }
 
-  initiatorIncomming(socket, details) {
+  initiatorIncomming (socket, details) {
     try {
       initiatorLog(`INITIATOR CONNECTION with connection ID: ${details.connId}`);
       extraverbose('Iniator details: ', details);
@@ -96,7 +107,7 @@ export default class SignalServer {
     }
   }
 
-  receiverIncomming(socket, details) {
+  receiverIncomming (socket, details) {
     try {
       receiverLog(`RECEIVER CONNECTION for ${details.connId}`);
       if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
@@ -119,7 +130,7 @@ export default class SignalServer {
     }
   }
 
-  receiverConfirm(socket, details) {
+  receiverConfirm (socket, details) {
     try {
       receiverLog('RECEIVER CONFIRM: ', details.connId);
       if (this.invalidHex(details.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
@@ -170,9 +181,9 @@ export default class SignalServer {
     }
   }
 
-  ioConnection(socket) {
+  ioConnection (socket) {
     try {
-      socket.use(this.validate.bind(this));
+      // socket.use(this.validate.bind(this));
       const token = socket.handshake.query;
       const connector = token.stage || false;
       if (this.invalidHex(token.connId)) throw new Error('Connection attempted to pass an invalid connection ID');
